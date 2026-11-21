@@ -1,6 +1,8 @@
 # Risk Miner — inteligentna baza doświadczeń inwestycji publicznych
 
 Prototyp na wyzwanie MFiPR (HackNation 2026), pilotaż: sektor wodno-kanalizacyjny.
+
+**Wersja online:** https://riskminer-hacknation.vercel.app (chroniona hasłem — hasło przekazuje zespół).
 System z pliku XLSX i publicznych ogłoszeń BZP buduje bazę przypadków:
 **projekt → postępowanie → ogłoszenia → umowa (z podziałem na części) → zmiany umowy → zdarzenia ryzyka**.
 Każdy rekord i każdy wniosek prowadzi do źródła, a każda propozycja (dopasowanie, zdarzenie, kategoria) czeka na decyzję eksperta.
