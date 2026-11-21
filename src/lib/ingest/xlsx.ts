@@ -1,6 +1,7 @@
 import "server-only";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 
 import { normalizeNip } from "./bzp";
 import { columnFieldByHeader, normalizeHeader, requiredHeaders } from "./columns";
@@ -112,9 +113,36 @@ export function rowsFromTable(header: string[], table: string[][]): ParseResult 
   return { rows, warnings };
 }
 
+const SPREADSHEET_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+/**
+ * Pliki z niektórych systemów (zapis przez Open XML SDK / .NET) mają poprawny, ale „prefiksowany” XML:
+ * `<x:workbook xmlns:x="…">`, `<x:sheet>`. Excel je otwiera, ExcelJS nie (błąd „reading 'sheets'”).
+ * Sprowadzamy części arkusza do zwykłej postaci (domyślna przestrzeń nazw) — treść się nie zmienia.
+ */
+export async function normalizeSpreadsheet(buffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const zip = await JSZip.loadAsync(buffer);
+  const workbookXml = await zip.file("xl/workbook.xml")?.async("string");
+  const prefix = workbookXml?.match(new RegExp(`xmlns:(\\w+)="${SPREADSHEET_NS.replace(/[./]/g, "\\$&")}"`))?.[1];
+  if (!prefix || !new RegExp(`<${prefix}:workbook\\b`).test(workbookXml ?? "")) return buffer;
+  const open = new RegExp(`<${prefix}:`, "g");
+  const close = new RegExp(`</${prefix}:`, "g");
+  const decl = new RegExp(`xmlns:${prefix}="${SPREADSHEET_NS.replace(/[./]/g, "\\$&")}"`, "g");
+  for (const name of Object.keys(zip.files)) {
+    if (!/\.(xml|rels)$/i.test(name) || zip.files[name].dir) continue;
+    const xml = (await zip.file(name)!.async("string")).replace(/^\uFEFF/, "");
+    if (!xml.includes(`<${prefix}:`)) {
+      zip.file(name, xml);
+      continue;
+    }
+    zip.file(name, xml.replace(open, "<").replace(close, "</").replace(decl, `xmlns="${SPREADSHEET_NS}"`));
+  }
+  return zip.generateAsync({ type: "arraybuffer" });
+}
+
 export async function parseProjectsXlsx(buffer: ArrayBuffer): Promise<ParseResult> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(await normalizeSpreadsheet(buffer));
   const sheet = workbook.getWorksheet("Projekty") ?? workbook.worksheets[0];
   if (!sheet) throw new Error("Plik nie zawiera arkusza z projektami.");
 
