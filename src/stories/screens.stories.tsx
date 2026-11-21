@@ -7,10 +7,11 @@ import { LlmView } from "@/components/screens/llm-view";
 import { ProjectDetailView } from "@/components/screens/project-detail-view";
 import { ProjectsListView } from "@/components/screens/projects-list-view";
 import { ReviewView } from "@/components/screens/review-view";
+import { SourceView } from "@/components/screens/source-view";
 import { Toaster } from "@/components/ui/sonner";
 
 import { demoUser, fakeResult, phone } from "./helpers";
-import { sampleCatalog, sampleDetail, sampleProjects, sampleReview } from "./rm-sample";
+import { sampleCatalog, sampleDetail, sampleProjects, sampleReview, sampleSource } from "./rm-sample";
 
 const path = (pathname: string) => ({ nextjs: { navigation: { pathname } } });
 
@@ -47,7 +48,17 @@ export const PulpitTelefon: Story = { ...Pulpit, ...phone, name: "Pulpit (telefo
 
 export const Projekty: Story = {
   parameters: path("/projects"),
-  render: () => <ProjectsListView projects={sampleProjects} />,
+  render: () => (
+    <ProjectsListView
+      projects={sampleProjects}
+      addProject={async () => ({ ok: true, message: "Dodano projekt RM-2026-023.", projectId: "RM-2026-023" })}
+      suggestedId="RM-2026-023"
+      addAction={async () => ({ ok: true, message: "Dodano 1 z 3 rekordów. Pominięto duplikaty: 2.", added: ["RM-2026-023"], skipped: [{ id: "RM-2026-001", title: "", reason: "identyfikator RM-2026-001 już istnieje w bazie" }], warnings: [] })}
+      enrichAction={fakeResult()}
+      searchAction={async (id: string) => ({ ok: true, projectId: id, message: `${id}: 2022/BZP 00058537 (po numerze ogłoszenia), ogłoszeń: 3` })}
+      buildAction={async (id: string) => ({ ok: true, projectId: id, message: `${id}: umów 1, zmian 6, zdarzeń 8 · koszt +6,6%, czas +77 dni` })}
+    />
+  ),
 };
 export const ProjektyTelefon: Story = { ...Projekty, ...phone, name: "Projekty (telefon)" };
 
@@ -66,6 +77,14 @@ export const Projekt: Story = {
   ),
 };
 export const ProjektTelefon: Story = { ...Projekt, ...phone, name: "Projekt (telefon)" };
+
+export const Zrodlo: Story = {
+  name: "Źródło z zaznaczonym fragmentem",
+  parameters: path("/sources/s3"),
+  render: () => <SourceView source={sampleSource} quote="Czy umowę wykonano w pierwotnie określonym terminie: Nie" backHref="/projects/RM-2026-001" />,
+};
+
+export const ZrodloTelefon: Story = { ...Zrodlo, ...phone, name: "Źródło z zaznaczonym fragmentem (telefon)" };
 
 export const Weryfikacja: Story = {
   parameters: path("/review"),

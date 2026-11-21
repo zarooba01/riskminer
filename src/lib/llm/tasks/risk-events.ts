@@ -2,13 +2,14 @@ import "server-only";
 
 import { z } from "zod";
 
+import { selectRelevantPages } from "@/lib/ingest/documents";
 import { db } from "@/lib/supabase/admin";
 import type { CatalogEntry, Contract, ContractChange, Project, RiskEvent } from "@/lib/rm/types";
 
 import { llmConfig } from "../config";
 import { runTask, type TaskSpec } from "../run";
 
-export const PROMPT_VERSION = "risk-events/v1";
+export const PROMPT_VERSION = "risk-events/v2";
 
 export const riskEventsSchema = z.object({
   events: z
@@ -78,6 +79,7 @@ export async function buildRiskEventsSpec(projectId: string): Promise<{ spec: Ta
   const textById = new Map((sources ?? []).map((s) => [s.id as string, (s.text_content as string) ?? ""]));
 
   const sourceTexts = new Map<string, { id: string; text: string }>();
+  const docBlocks: string[] = [];
   let budget = llmConfig.maxInputChars;
   const order = ["ContractPerformingNotice", "AgreementUpdateNotice", "TenderResultNotice", "ContractNotice"];
   const docs = [...(notices ?? [])]
@@ -103,6 +105,22 @@ export async function buildRiskEventsSpec(projectId: string): Promise<{ spec: Ta
   const changeLines = ((changes ?? []) as ContractChange[])
     .map((c) => `- zmiana ${c.change_no ?? "?"}: ${c.legal_basis ?? ""}; przyczyna: ${c.reason ?? ""}; wartość: ${pln(c.value_change)}`)
     .join("\n");
+
+  // Dokumenty dodane przez eksperta (aneksy, protokoły…) — ponowna analiza sprawy uwzględnia ich treść.
+  const { data: expertDocs } = await supabase.from("rm_documents").select("doc_type,file_name,source_id").eq("project_id", projectId);
+  if (expertDocs?.length && budget > 0) {
+    const ids = expertDocs.map((d) => d.source_id).filter(Boolean) as string[];
+    const { data: docSources } = ids.length ? await supabase.from("rm_sources").select("id,raw,text_content").in("id", ids) : { data: [] };
+    for (const d of expertDocs) {
+      const src = (docSources ?? []).find((x) => x.id === d.source_id);
+      const pages = ((src?.raw as { pages?: string[] } | null)?.pages ?? []) as string[];
+      if (!pages.length || budget <= 0) continue;
+      const picked = selectRelevantPages(pages, Math.min(budget, 6000));
+      budget -= picked.text.length;
+      sourceTexts.set(d.file_name, { id: d.source_id as string, text: src?.text_content ?? "" });
+      docBlocks.push(`### Dokument eksperta: ${d.doc_type} (${d.file_name})\n${picked.text}`);
+    }
+  }
 
   const catalogText = ((catalog ?? []) as CatalogEntry[]).map((c) => `${c.code} ${c.name} — ${c.effects ?? ""}`).join("\n");
   const examplesText = (examples ?? []).length
@@ -131,7 +149,7 @@ Zmiany umowy:
 ${changeLines || "Brak informacji o zmianach."}
 
 Źródła:
-${docs || "Brak ogłoszeń."}`;
+${docs || "Brak ogłoszeń."}${docBlocks.length ? `\n\n${docBlocks.join("\n\n")}` : ""}`;
 
   return {
     spec: { task: "risk_events", promptVersion: PROMPT_VERSION, system, prompt, schema: riskEventsSchema, projectId },
@@ -141,14 +159,24 @@ ${docs || "Brak ogłoszeń."}`;
 
 const squash = (s: string) => s.replace(/[\s"„”]+/g, " ").trim().toLowerCase();
 
+/** Cytat może łączyć kilka fragmentów źródła wielokropkiem — każdy fragment musi występować dosłownie. */
+export function quoteFound(text: string, quote: string): boolean {
+  const haystack = squash(text);
+  const parts = quote
+    .split(/\s*(?:\.\.\.|…|\[\.\.\.\])\s*/)
+    .map(squash)
+    .filter((p) => p.length >= 8);
+  return parts.length > 0 && parts.every((p) => haystack.includes(p));
+}
+
 /** Zapis wyników modelu jako propozycji do weryfikacji; cytat sprawdzamy dosłownie w tekście źródła. */
 export async function saveRiskEvents(projectId: string, runId: string, output: RiskEventsOutput, sourceTexts: Map<string, { id: string; text: string }>) {
   const supabase = db();
   await supabase.from("rm_risk_events").delete().eq("project_id", projectId).eq("origin", "llm").eq("status", "proposed");
 
   const rows: Partial<RiskEvent>[] = output.events.map((e) => {
-    const source = sourceTexts.get(e.source_notice) ?? [...sourceTexts.values()].find((s) => squash(s.text).includes(squash(e.quote)));
-    const verified = Boolean(source && e.quote && squash(source.text).includes(squash(e.quote)));
+    const source = sourceTexts.get(e.source_notice) ?? [...sourceTexts.values()].find((s) => quoteFound(s.text, e.quote));
+    const verified = Boolean(source && e.quote && quoteFound(source.text, e.quote));
     return {
       project_id: projectId,
       risk_code: e.risk_code,

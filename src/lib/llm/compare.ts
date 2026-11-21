@@ -5,9 +5,8 @@ import type { LlmRun } from "@/lib/rm/types";
 
 import { llmConfig } from "./config";
 import { runTask } from "./run";
-import { buildRiskEventsSpec, type RiskEventsOutput } from "./tasks/risk-events";
+import { buildRiskEventsSpec, quoteFound, type RiskEventsOutput } from "./tasks/risk-events";
 
-const squash = (s: string) => s.replace(/[\s"„”]+/g, " ").trim().toLowerCase();
 
 /** Ten sam wsad na N modeli; każdy przebieg zapisany w rm_llm_runs. Nie zapisuje zdarzeń do weryfikacji. */
 export async function compareModels(projectId: string, models: string[]) {
@@ -50,7 +49,7 @@ export async function runMetrics(projectId: string): Promise<{ metrics: RunMetri
 
   const sourceIds = (sources ?? []).map((s) => s.source_id as string);
   const { data: texts } = sourceIds.length ? await supabase.from("rm_sources").select("text_content").in("id", sourceIds) : { data: [] };
-  const corpus = squash((texts ?? []).map((t) => t.text_content ?? "").join("\n"));
+  const corpus = (texts ?? []).map((t) => t.text_content ?? "").join("\n");
 
   const goldCodes = [...new Set((gold ?? []).map((g) => g.risk_code as string))].sort();
   const latest = new Map<string, LlmRun>();
@@ -60,7 +59,7 @@ export async function runMetrics(projectId: string): Promise<{ metrics: RunMetri
     const output = run.output as RiskEventsOutput | null;
     const events = output?.events ?? [];
     const codes = [...new Set(events.map((e) => e.risk_code))].sort();
-    const verified = events.filter((e) => e.quote && corpus.includes(squash(e.quote))).length;
+    const verified = events.filter((e) => e.quote && quoteFound(corpus, e.quote)).length;
     const hit = codes.filter((c) => goldCodes.includes(c)).length;
     return {
       run,

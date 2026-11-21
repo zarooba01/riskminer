@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   },
   // Plik XLSX organizatora dołączamy do funkcji serwerowych (import „zestawu startowego”).
   outputFileTracingIncludes: { "/*": ["./data/**"] },
+  experimental: {
+    // Import pliku z projektami idzie przez server action (domyślnie maks. 1 MB). 4 MB = poniżej limitu żądania na Vercel (4,5 MB).
+    serverActions: { bodySizeLimit: "4mb" },
+  },
 };
 
 export default nextConfig;

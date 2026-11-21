@@ -163,13 +163,93 @@ export const sampleDetail: ProjectDetailData = {
         source_ids: ["s1", "s2", "s3"],
       }],
       changes: [
-        { id: "ch3", contract_id: "c1", change_no: 3, changed_at: null, legal_basis: "art. 455 ust. 2 ustawy", reason: "roboty uzupełniające — wyburzenie murów ceglano-betonowych", description: null, value_change: 9337.83, price_increase: true, source_id: "s3" },
-        { id: "ch4", contract_id: "c1", change_no: 4, changed_at: null, legal_basis: "art. 455 ust. 1 pkt 1 ustawy", reason: "protokół", description: "Strony ustalają, że przedmiot umowy zostanie wykonany w terminie 14 m-cy", value_change: null, price_increase: false, source_id: "s3" },
+        { id: "ch3", contract_id: "c1", change_no: 3, changed_at: null, legal_basis: "art. 455 ust. 2 ustawy", reason: "roboty uzupełniające — wyburzenie murów ceglano-betonowych", description: null, value_change: 9337.83, price_increase: true, source_id: "s3", new_end_date: null, related_source_ids: [] },
+        { id: "ch4", contract_id: "c1", change_no: 4, changed_at: null, legal_basis: "art. 455 ust. 1 pkt 1 ustawy", reason: "protokół", description: "Strony ustalają, że przedmiot umowy zostanie wykonany w terminie 14 m-cy", value_change: null, price_increase: false, source_id: "s3", new_end_date: null, related_source_ids: [] },
       ],
     },
   ],
   events: sampleEvents,
   sources,
+  externalChecks: [
+    {
+      id: "x1",
+      project_id: "RM-2026-001",
+      source: "platform",
+      status: "found",
+      url: "https://platformazakupowa.pl/transakcja/563211",
+      title: "Budowa rurociągu tłocznego kanalizacji sanitarnej Godzikowice – Jaczkowice, gmina Oława",
+      confidence: 0.96,
+      basis: ["na stronie występuje numer ogłoszenia BZP 2022/BZP 00058537", "tytuł postępowania zgodny w 100%", "dokumentów postępowania: 18", "wartość umowy z BZP (2 107 348,39 zł) występuje w dokumencie „Informacja z otwarcia ofert.pdf”"],
+      details: {
+        buyerSite: "https://bip.gminaolawa.pl",
+        documents: [
+          { name: "Załącznik nr 2 do SWZ - Wzór umowy.pdf", date: "2022-02-16", url: "https://platformazakupowa.pl/file/get_new/a.pdf" },
+          { name: "Informacja z otwarcia ofert.pdf", date: "2022-03-03", url: "https://platformazakupowa.pl/file/get_new/b.pdf" },
+        ],
+        documentSources: [{ name: "Informacja z otwarcia ofert.pdf", sourceId: "s2", url: "https://platformazakupowa.pl/file/get_new/b.pdf" }],
+        budget: null,
+      },
+      source_id: "s1",
+      checked_at: now,
+    },
+    {
+      id: "x2",
+      project_id: "RM-2026-001",
+      source: "ted",
+      status: "not_found",
+      url: "https://ted.europa.eu/pl/search/result?FT=Oława",
+      title: null,
+      confidence: null,
+      basis: ["sprawdzono 50 ogłoszeń zamawiającego w TED od 2021 r.", "zamówienie poniżej progów UE — publikacja w TED nie była wymagana"],
+      details: {},
+      source_id: null,
+      checked_at: now,
+    },
+  ],
+  changeReports: [
+    {
+      id: "r1",
+      project_id: "RM-2026-001",
+      trigger: "Analiza dodanego dokumentu",
+      created_at: now,
+      summary: {
+        added: [{ id: "e9", title: "Kolizja z niezinwentaryzowanym murem", risk_code: "R02", origin: "llm", status: "proposed" }],
+        removed: [],
+        changed: [
+          {
+            event: { id: "e1", title: "Wykonanie umowy po terminie (+77 dni)", risk_code: "R06", origin: "rule", status: "proposed" },
+            fields: [{ field: "cause", label: "Przyczyna", before: null, after: "zmiana nr 4 (art. 455 ust. 1 pkt 1): wydłużenie terminu do 14 m-cy" }],
+          },
+        ],
+        unchanged: 4,
+        contracts: [],
+        changes: { before: 2, after: 2 },
+        findingsAdded: [{ id: "f1", kind: "adds", statement: "Aneks podaje przyczynę wydłużenia terminu: kolizja z murem." }],
+        decisionsKept: 1,
+      },
+    },
+  ],
+};
+
+export const sampleSource = {
+  id: "s3",
+  kind: "bzp",
+  title: "2026/BZP 00147223/01 — Budowa rurociągu tłocznego kanalizacji sanitarnej Godzikowice – Jaczkowice",
+  url: "https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/08da0000-0000-0000-0000-000000000000",
+  external_id: "2026/BZP 00147223/01",
+  fetched_at: now,
+  content_hash: "8f4e3e1068b7c0ffee",
+  text_content: [
+    "Ogłoszenie o wykonaniu umowy",
+    "SEKCJA V PRZEBIEG REALIZACJI UMOWY",
+    " 5.1.) Czy umowa została wykonana: Tak",
+    " 5.2.) Termin wykonania umowy: 2023-06-22",
+    " 5.3.) Czy umowę wykonano w pierwotnie określonym terminie: Nie",
+    " 5.4.2.) Numer zmiany: 4",
+    " 5.4.4.) Przyczyny dokonania zmian: protokół",
+    " 5.4.5.) Krótki opis zamówienia po zmianie: Strony ustalają, że przedmiot umowy zostanie wykonany w terminie 14 m-cy",
+    " 5.5.) Łączna wartość wynagrodzenia wypłacona z tytułu zrealizowanej umowy: 2246177,66 PLN",
+  ].join("\n"),
 };
 
 export const sampleReview: ReviewData = {

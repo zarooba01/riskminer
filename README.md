@@ -14,6 +14,12 @@ Każdy rekord i każdy wniosek prowadzi do źródła, a każda propozycja (dopas
 | Import XLSX organizatora (walidacja NIP, podsektory wg słownika eksperckiego, wartości z adnotacji KPO) | działa |
 | Wzbogacenie z BZP: numer ogłoszenia → OCID → wynik, zmiany, wykonanie umowy; rekordy KPO wyszukiwane po NIP z oceną pewności; zapasowe wyszukiwanie przy błędnym numerze | działa |
 | Odtworzenie umowy z ogłoszeń (wartość, termin, wypłata, zmiany art. 455), zamówienia w częściach, korekty ogłoszeń | działa |
+| Jedna zmiana umowy = jeden rekord: ta sama zmiana z ogłoszenia o zmianie i o wykonaniu umowy jest scalana (kwota / przyczyna + opis), nowy termin z opisu aneksu | działa |
+| Źródła dodatkowe: strona postępowania zamawiającego (platforma zakupowa / BIP, adres z ogłoszenia) — lista dokumentów, odczyt kluczowych PDF i sprawdzenie krzyżowe numeru BZP i wartości umowy; TED (API) | działa |
+| Karta „Plan i wykonanie”: wynagrodzenie vs wypłata, pierwotny termin vs zakończenie, stan po aneksach — osobno dla każdej części i każdego zamówienia inwestycji | działa |
+| Podgląd źródła w aplikacji z zaznaczonym fragmentem (każde ustalenie, zmiana umowy, kwota i data) + link do oryginału w e-Zamówieniach | działa |
+| Jawny „brak danych w źródle”, gdy źródło nie podaje przyczyny albo skutku | działa |
+| Raport „co się zmieniło” po ponownym wzbogaceniu, analizie AI albo dodaniu dokumentu (nowe / zmienione: było → jest / usunięte, decyzje eksperta zachowane) | działa |
 | Odchylenia kosztu i czasu (obliczenia deterministyczne, oznaczone jako „Obliczenie”) | działa |
 | Zdarzenia ryzyka z reguł (koszt 0, cytat dosłowny ze źródła) | działa |
 | Zdarzenia ryzyka z modelu AI (katalog R01–R15, cytat weryfikowany w źródle, propozycje nowych kategorii) | działa (wymaga AI Gateway) |
@@ -22,7 +28,7 @@ Każdy rekord i każdy wniosek prowadzi do źródła, a każda propozycja (dopas
 | Eksport CSV/JSON każdej encji | działa |
 | Hasło witryny (`SITE_PASSWORD`) | działa |
 | Analiza nowej inwestycji (podobne projekty, przedziały odchyleń, flagi, zapisy umowne) | następny krok |
-| Upload DOCX/PDF, TED, KIO, NIK, monitoring trwających inwestycji (cron) | zaprojektowane |
+| KIO, NIK, monitoring trwających inwestycji (cron), odczyt platform-aplikacji JS (Marketplanet, Logintrade) | zaprojektowane |
 
 ## Architektura
 
@@ -52,6 +58,9 @@ BZP API (kopia bzp.cytr.us / ezamowienia.gov.pl)
 2. **Rekord KPO bez numeru**: ogłoszenia w województwie zamawiającego, filtr po NIP (API BZP nie filtruje po NIP), podobieństwo nazwy, CPV, wzmianka o KPO → pewność 55–95%, do decyzji eksperta. Alternatywy pokazywane tylko, gdy wynik jest niejednoznaczny.
 3. **Ogłoszenia powiązane** po identyfikatorze postępowania (OCID `tenderId`) — wynik, zmiany, wykonanie umowy.
 4. **Zamówienia w częściach**: osobna umowa na część; ogłoszenie o wykonaniu przypisane do części po wartości umowy. Rekord „część N” korzysta ze swojej części.
+5. **Kilka zamówień jednej inwestycji**: ekspert dodaje kolejny przetarg („Wskaż inny przetarg” → „Dodaj jako kolejne zamówienie”); karta projektu przełącza zamówienia (`?zamowienie=`).
+6. **Zmiany umowy**: ogłoszenie o wykonaniu podaje ponumerowaną listę zmian, a każda mogła mieć wcześniej osobne ogłoszenie o zmianie (bez numeru). Łączymy je po kwocie (do 5% różnicy przy tej samej przyczynie) albo po przyczynie i opisie; głównym źródłem jest ogłoszenie o zmianie (data, pełny opis), pozostałe trafiają do `related_source_ids`.
+7. **Źródła dodatkowe** (`src/lib/ingest/external.ts`, tabela `rm_external_checks`): adres strony postępowania z pkt 3.1 ogłoszenia o zamówieniu → lista dokumentów, odczyt PDF (informacja o kwocie, z otwarcia ofert, o wyborze oferty), sprawdzenie numeru BZP, tytułu i wartości umowy; TED — wyszukiwanie po nazwie zamawiającego i podobieństwie tytułu (próg 70%). Wynik „nie znaleziono” też jest zapisywany z podstawą (np. zamówienie poniżej progów UE). Potwierdzenie na stronie zamawiającego dopisujemy do podstawy niepewnego dopasowania.
 
 ## Model językowy: konfiguracja, koszt, miejsce przetwarzania
 
@@ -73,6 +82,7 @@ npm install
 cp .env.example .env.local          # uzupełnij Supabase i (lokalnie) AI_GATEWAY_API_KEY
 psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/0002_riskminer.sql
 psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/0003_contract_parts.sql
+# … i kolejne migracje po kolei, do 0007_sources_and_reports.sql
 npm run dev                         # http://localhost:3000 → Pulpit → Importuj → Wzbogać wszystkie
 ```
 
@@ -83,7 +93,7 @@ API do automatyzacji (te same operacje co w interfejsie, powtarzalne):
 | POST | `/api/import` | import zestawu organizatora (lub pliku `file`, multipart) |
 | POST | `/api/projects/<id>/enrich` | wzbogacenie z BZP |
 | POST | `/api/projects/<id>/analyze?model=…` | analiza ryzyk modelem |
-| GET | `/api/export/<encja>?format=csv\|json[&project=…]` | eksport: projects, procurements, notices, contracts, changes, events, catalog, sources, llm_runs, decisions |
+| GET | `/api/export/<encja>?format=csv\|json[&project=…]` | eksport: projects, procurements, notices, contracts, changes, events, catalog, sources, llm_runs, decisions, documents, findings, external_checks, change_reports |
 
 ## Deploy na Vercel
 

@@ -10,6 +10,10 @@ export const exportEntities = {
   sources: { table: "rm_sources", label: "Źródła (identyfikator, link, data pobrania)", select: "id,kind,title,url,external_id,fetched_at,content_hash" },
   llm_runs: { table: "rm_llm_runs", label: "Przebiegi modeli (koszt, czas, wynik)", select: "*" },
   decisions: { table: "rm_decisions", label: "Historia decyzji eksperta", select: "*" },
+  documents: { table: "rm_documents", label: "Dokumenty dodane przez eksperta", select: "id,project_id,contract_id,source_id,doc_type,file_name,pages,chars,status,summary,error,created_at" },
+  findings: { table: "rm_document_findings", label: "Ustalenia z dokumentów (potwierdza / uzupełnia / rozbieżności)", select: "*" },
+  external_checks: { table: "rm_external_checks", label: "Źródła dodatkowe (strona postępowania, TED): wynik i podstawa", select: "*" },
+  change_reports: { table: "rm_change_reports", label: "Raporty zmian po ponownej analizie", select: "*" },
 } as const;
 
 export type ExportEntity = keyof typeof exportEntities;

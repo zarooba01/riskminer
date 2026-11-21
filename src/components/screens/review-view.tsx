@@ -1,11 +1,10 @@
-import Link from "next/link";
-
 import { PageHeader } from "@/components/layout/page-header";
 import { ActionButton } from "@/components/rm/action-button";
-import { Confidence, Provenance } from "@/components/rm/provenance";
+import type { MatchActions, MatchDialogProject } from "@/components/rm/match-dialog";
+import { MatchRow } from "@/components/rm/match-row";
+import { Provenance } from "@/components/rm/provenance";
 import { RiskEventCard, type RiskEventActions } from "@/components/rm/risk-event-card";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +13,7 @@ import type { CatalogEntry, Decision, Procurement, RiskEvent, Source } from "@/l
 
 export type ReviewData = {
   events: (RiskEvent & { project_title: string })[];
-  procurements: (Procurement & { project_title: string })[];
+  procurements: (Procurement & { project_title: string; project?: MatchDialogProject; notice_url?: string | null; published_at?: string | null })[];
   catalog: CatalogEntry[];
   decisions: Decision[];
   sources: Record<string, Source>;
@@ -24,6 +23,7 @@ type Props = {
   data: ReviewData;
   eventActions?: RiskEventActions;
   decideProcurement?: (id: string, decision: "accept" | "reject" | "reopen") => Promise<ActionResult>;
+  assignProcurement?: MatchActions["assign"];
   decideCatalog?: (code: string, approved: boolean) => Promise<ActionResult>;
 };
 
@@ -48,7 +48,7 @@ function NothingHere({ text }: { text: string }) {
 }
 
 /** Panel eksperta: każda propozycja (dopasowanie, zdarzenie, kategoria) wymaga decyzji; wszystko trafia do historii. */
-export function ReviewView({ data, eventActions, decideProcurement, decideCatalog }: Props) {
+export function ReviewView({ data, eventActions, decideProcurement, assignProcurement, decideCatalog }: Props) {
   const approvedCatalog = data.catalog.filter((c) => c.approved);
   const proposedCatalog = data.catalog.filter((c) => !c.approved);
 
@@ -59,7 +59,9 @@ export function ReviewView({ data, eventActions, decideProcurement, decideCatalo
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="events">Zdarzenia ({data.events.length})</TabsTrigger>
           <TabsTrigger value="matches">Dopasowania ({data.procurements.length})</TabsTrigger>
-          <TabsTrigger value="catalog">Katalog ({proposedCatalog.length})</TabsTrigger>
+          <TabsTrigger value="catalog">
+            Katalog ({data.catalog.length}){proposedCatalog.length > 0 && ` · ${proposedCatalog.length} do zatwierdzenia`}
+          </TabsTrigger>
           <TabsTrigger value="history">Historia</TabsTrigger>
         </TabsList>
 
@@ -67,7 +69,7 @@ export function ReviewView({ data, eventActions, decideProcurement, decideCatalo
           {data.events.length === 0 ? (
             <NothingHere text="Brak zdarzeń do weryfikacji. Wzbogać projekty lub uruchom analizę AI." />
           ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="flex flex-col gap-4">
               {data.events.map((e) => (
                 <RiskEventCard
                   key={e.id}
@@ -84,45 +86,16 @@ export function ReviewView({ data, eventActions, decideProcurement, decideCatalo
 
         <TabsContent value="matches">
           {data.procurements.length === 0 ? (
-            <NothingHere text="Wszystkie dopasowania projektów do postępowań BZP są rozstrzygnięte." />
+            <NothingHere text="Wszystkie dopasowania projektów do przetargów w BZP są rozstrzygnięte." />
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {data.procurements.map((p) => (
-                <Card key={p.id}>
-                  <CardHeader>
-                    <div className="flex flex-wrap gap-2">
-                      <Confidence value={p.match_confidence} />
-                      <Badge variant="outline">{p.match_method === "notice_number" ? "po numerze BZP" : "wyszukiwanie"}</Badge>
-                    </div>
-                    <CardTitle className="text-base">
-                      <Link href={`/projects/${p.project_id}`} className="hover:underline">
-                        {p.project_id}: {p.project_title}
-                      </Link>
-                    </CardTitle>
-                    <CardDescription>
-                      ↔ {p.bzp_number}: {p.title}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="list-inside list-disc text-sm">
-                      {p.match_basis.map((b) => (
-                        <li key={b}>{b}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                  {decideProcurement && (
-                    <CardFooter className="gap-2">
-                      <ActionButton size="sm" action={decideProcurement.bind(null, p.id, "accept")}>
-                        Potwierdź
-                      </ActionButton>
-                      <ActionButton size="sm" variant="ghost" action={decideProcurement.bind(null, p.id, "reject")}>
-                        Odrzuć
-                      </ActionButton>
-                    </CardFooter>
-                  )}
-                </Card>
-              ))}
-            </div>
+            <>
+              <p className="pb-2 text-sm text-muted-foreground">Czy projekt z pliku to na pewno ten przetarg w BZP? Najmniej pewne na górze.</p>
+              <ul className="flex flex-col">
+                {data.procurements.map((p) => (
+                  <MatchRow key={p.id} match={p} decide={decideProcurement} assign={assignProcurement} />
+                ))}
+              </ul>
+            </>
           )}
         </TabsContent>
 

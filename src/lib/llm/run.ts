@@ -3,7 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import { generateText, Output } from "ai";
-import type { z } from "zod";
+import { toJSONSchema, type z } from "zod";
 
 import { db } from "@/lib/supabase/admin";
 
@@ -17,6 +17,44 @@ export type TaskSpec<S extends z.ZodType> = {
   schema: S;
   projectId?: string;
 };
+
+const common = { reasoning: "none", temperature: 0, maxRetries: 1, providerOptions: { gateway: { caching: "auto" } } } as const;
+
+/** Pierwszy obiekt JSON z odpowiedzi tekstowej (także w bloku ```json). */
+function extractJson(text: string): unknown {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = fenced ? fenced[1] : text;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("Model nie zwrócił obiektu JSON.");
+  return JSON.parse(body.slice(start, end + 1));
+}
+
+/**
+ * Wywołanie z wynikiem zgodnym ze schematem. Najpierw natywny tryb strukturalny (Output.object); gdy model go nie
+ * obsługuje (np. część modeli z darmowego progu AI Gateway), tryb zapasowy: prośba o czysty JSON według schematu
+ * i walidacja zod po naszej stronie. Wynik jest w obu przypadkach tak samo sprawdzony.
+ */
+async function generateStructured<S extends z.ZodType>(spec: TaskSpec<S>, model: string) {
+  try {
+    const result = await generateText({ model, system: spec.system, prompt: spec.prompt, output: Output.object({ schema: spec.schema }), ...common });
+    return { result, parsed: result.output as z.infer<S> };
+  } catch (structuredError) {
+    const schema = JSON.stringify(toJSONSchema(spec.schema));
+    const result = await generateText({
+      model,
+      system: `${spec.system}\n\nOdpowiedz WYŁĄCZNIE jednym obiektem JSON zgodnym z tym schematem JSON (bez komentarzy i tekstu poza JSON):\n${schema}`,
+      prompt: spec.prompt,
+      ...common,
+    });
+    const check = spec.schema.safeParse(extractJson(result.text));
+    if (!check.success) {
+      const first = structuredError instanceof Error ? structuredError.message.slice(0, 200) : "";
+      throw new Error(`Odpowiedź modelu niezgodna ze schematem: ${check.error.issues.slice(0, 3).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}${first ? ` (tryb strukturalny: ${first})` : ""}`);
+    }
+    return { result, parsed: check.data as z.infer<S> };
+  }
+}
 
 export type RunResult<T> = { runId: string; output: T | null; cached: boolean; error: string | null; costUsd: number | null };
 
@@ -46,17 +84,8 @@ export async function runTask<S extends z.ZodType>(spec: TaskSpec<S>, model: str
   let costUsd: number | null = null;
 
   try {
-    const result = await generateText({
-      model,
-      system: spec.system,
-      prompt: spec.prompt,
-      output: Output.object({ schema: spec.schema }),
-      reasoning: "none",
-      temperature: 0,
-      maxRetries: 1,
-      providerOptions: { gateway: { caching: "auto" } },
-    });
-    output = result.output as z.infer<S>;
+    const { result, parsed } = await generateStructured(spec, model);
+    output = parsed;
     const usage = result.totalUsage;
     const noCache = usage.inputTokenDetails?.noCacheTokens ?? usage.inputTokens ?? 0;
     const cacheRead = usage.inputTokenDetails?.cacheReadTokens ?? 0;

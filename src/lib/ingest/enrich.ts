@@ -3,11 +3,12 @@ import "server-only";
 import { createHash } from "node:crypto";
 
 import { db } from "@/lib/supabase/admin";
-import { addMonths, daysBetween, htmlToText, parseNotice, type ParsedContractChange, type ParsedNotice, type ParsedPart } from "@/lib/rm/notice-parse";
+import { addMonths, daysBetween, extractNewEndDate, htmlToText, parseNotice, type ParsedContractChange, type ParsedNotice, type ParsedPart } from "@/lib/rm/notice-parse";
 import { proposeRuleEvents } from "@/lib/rm/rules";
 import type { CatalogEntry, Project } from "@/lib/rm/types";
 
-import { normalizeNip, normalizeNoticeNumber, noticeUrl, searchNotices, type BzpNotice, type BzpQuery } from "./bzp";
+import { checkExternalSources, type ExternalCheckRow } from "./external";
+import { normalizeNip, normalizeNoticeNumber, noticePublicUrl, noticeUrl, searchNotices, type BzpNotice, type BzpQuery } from "./bzp";
 
 export type LogEntry = { at: string; step: string; detail: string; url?: string; count?: number };
 
@@ -36,6 +37,16 @@ export function similarity(a: string, b: string): number {
   return (2 * common) / (ta.size + tb.size);
 }
 
+/** Rdzeń nazwy zamawiającego do filtra OrganizationName: „Gmina Kartuzy – Urząd Miejski w Kartuzach” → „Kartuzy”. */
+export function organizationNameKey(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const core = name
+    .split(/\s+[–-]\s+/)[0]
+    .replace(/^(gmina(\s+(miejska|wiejska|miasto))?|miasto(\s+i\s+gmina)?|miasto\s+stołeczne|urząd\s+(miejski|miasta|gminy|miasta\s+i\s+gminy)\s+w)\s+/i, "")
+    .trim();
+  return core.length >= 3 ? core : null;
+}
+
 type Candidate = { notice: BzpNotice; method: "notice_number" | "kpo_search"; confidence: number; basis: string[] };
 
 async function upsertSource(notice: BzpNotice, query: BzpQuery) {
@@ -47,7 +58,7 @@ async function upsertSource(notice: BzpNotice, query: BzpQuery) {
         kind: "bzp",
         external_id: notice.noticeNumber,
         title: `${notice.noticeNumber} — ${notice.orderObject}`.slice(0, 500),
-        url: noticeUrl({ NoticeType: query.NoticeType, NoticeNumber: notice.noticeNumber }),
+        url: notice.objectId ? noticePublicUrl(notice.objectId) : noticeUrl({ NoticeType: query.NoticeType, NoticeNumber: notice.noticeNumber }),
         fetched_at: new Date().toISOString(),
         content_hash: sha(notice.htmlBody ?? ""),
         raw: { ...notice, htmlBody: undefined },
@@ -93,16 +104,23 @@ async function findContractNotices(project: Project, log: LogEntry[]): Promise<C
   }
   // KPO B3.1.1: nabory od 2023 r.; przy błędnym numerze BZP rok bierzemy z numeru (z zapasem).
   const fromYear = number ? Number(number.slice(0, 4)) - 1 : 2023;
-  const query: BzpQuery = { NoticeType: "ContractNotice", OrganizationProvince: province, PublicationDateFrom: `${fromYear}-01-01T00:00:00` };
-  const all = await searchNotices(query, 10);
-  const own = all.filter((n) => normalizeNip(n.organizationNationalId) === nip);
-  log.push({
-    at: new Date().toISOString(),
-    step: "BZP: wyszukiwanie po regionie, filtr NIP",
-    detail: `${all.length} ogłoszeń w ${province}, ${own.length} z NIP ${nip}`,
-    url: noticeUrl(query),
-    count: own.length,
-  });
+  const from = `${fromYear}-01-01T00:00:00`;
+  // 1) Szybko: filtr po fragmencie nazwy zamawiającego (API BZP nie filtruje po NIP) — ułamek sekundy.
+  // 2) Zapasowo: pełny przegląd województwa (wolny: strony po ~18 MB), tylko gdy 1) nic nie da.
+  const nameKey = organizationNameKey(project.beneficiary_name);
+  let own: BzpNotice[] = [];
+  if (nameKey) {
+    const query: BzpQuery = { NoticeType: "ContractNotice", OrganizationProvince: province, OrganizationName: nameKey, PublicationDateFrom: from };
+    const all = await searchNotices(query, 4);
+    own = all.filter((n) => normalizeNip(n.organizationNationalId) === nip);
+    log.push({ at: new Date().toISOString(), step: "BZP: wyszukiwanie po nazwie zamawiającego, filtr NIP", detail: `„${nameKey}” w ${province}: ${all.length} ogłoszeń, ${own.length} z NIP ${nip}`, url: noticeUrl(query), count: own.length });
+  }
+  if (!own.length) {
+    const query: BzpQuery = { NoticeType: "ContractNotice", OrganizationProvince: province, PublicationDateFrom: from };
+    const all = await searchNotices(query, 6);
+    own = all.filter((n) => normalizeNip(n.organizationNationalId) === nip);
+    log.push({ at: new Date().toISOString(), step: "BZP: wyszukiwanie po regionie, filtr NIP", detail: `${all.length} ogłoszeń w ${province}, ${own.length} z NIP ${nip}`, url: noticeUrl(query), count: own.length });
+  }
 
   const reference = `${project.title} ${project.annotation ?? ""}`;
   const scored = own
@@ -126,25 +144,109 @@ async function findContractNotices(project: Project, log: LogEntry[]): Promise<C
 
 /** Krok 2: ogłoszenia powiązane (wynik, zmiany, wykonanie) — po OCID postępowania, filtrowane u nas. */
 async function findRelated(contractNotice: BzpNotice, log: LogEntry[]): Promise<{ notice: BzpNotice; query: BzpQuery }[]> {
-  const out: { notice: BzpNotice; query: BzpQuery }[] = [];
-  for (const type of ["TenderResultNotice", "AgreementUpdateNotice", "ContractPerformingNotice"] as const) {
-    const query: BzpQuery = {
-      NoticeType: type,
-      OrganizationProvince: contractNotice.organizationProvince,
-      OrganizationCity: contractNotice.organizationCity,
-      PublicationDateFrom: contractNotice.publicationDate.slice(0, 10) + "T00:00:00",
-    };
-    const found = (await searchNotices(query, 6)).filter((n) => n.tenderId === contractNotice.tenderId);
+  // Trzy typy ogłoszeń równolegle (kopia BZP nie ma limitu zapytań).
+  const results = await Promise.all(
+    (["TenderResultNotice", "AgreementUpdateNotice", "ContractPerformingNotice"] as const).map(async (type) => {
+      const query: BzpQuery = {
+        NoticeType: type,
+        OrganizationProvince: contractNotice.organizationProvince,
+        OrganizationCity: contractNotice.organizationCity,
+        PublicationDateFrom: contractNotice.publicationDate.slice(0, 10) + "T00:00:00",
+      };
+      const found = (await searchNotices(query, 6)).filter((n) => n.tenderId === contractNotice.tenderId);
+      return { type, query, found };
+    }),
+  );
+  return results.flatMap(({ type, query, found }) => {
     log.push({ at: new Date().toISOString(), step: `BZP: ${type} po OCID`, detail: contractNotice.tenderId, url: noticeUrl(query), count: found.length });
-    out.push(...found.map((notice) => ({ notice, query })));
-  }
-  return out;
+    return found.map((notice) => ({ notice, query }));
+  });
 }
 
 type StoredNotice = { notice: BzpNotice; parsed: ParsedNotice; sourceId: string; text: string };
 
 const near = (a: number | null | undefined, b: number | null | undefined) => a != null && b != null && Math.abs(a - b) < 1;
 const sameNip = (a: string | null | undefined, b: string | null | undefined) => Boolean(a && b && a.replace(/\D/g, "") === b.replace(/\D/g, ""));
+
+const squashText = (s: string | null | undefined) => (s ?? "").replace(/[\s"„”]+/g, " ").trim().toLowerCase();
+
+/** Czy dwa opisy dotyczą tej samej zmiany umowy: ta sama kwota, a bez kwot — ta sama przyczyna i podobny opis. */
+function sameChange(a: ParsedContractChange, b: ParsedContractChange): boolean {
+  if (a.valueChange != null && b.valueChange != null) {
+    if (Math.abs(a.valueChange - b.valueChange) < 1) return true;
+    // Ta sama zmiana bywa podana z różną kwotą (np. korekta rozliczenia w ogłoszeniu o wykonaniu) — do 5% różnicy
+    // uznajemy ją za tę samą, jeśli przyczyna jest identyczna, a opis podobny.
+    const close = Math.abs(a.valueChange - b.valueChange) <= 0.05 * Math.max(Math.abs(a.valueChange), Math.abs(b.valueChange));
+    return close && squashText(a.reason) === squashText(b.reason) && similarity(a.description ?? "", b.description ?? "") >= 0.5;
+  }
+  if ((a.valueChange == null) !== (b.valueChange == null)) return false;
+  const ra = squashText(a.reason);
+  return ra.length > 10 && ra === squashText(b.reason) && similarity(a.description ?? "", b.description ?? "") >= 0.3;
+}
+
+type ChangeDraft = { no: number; change: ParsedContractChange; sourceId: string; related: string[]; claimed: boolean };
+
+/**
+ * Jedna zmiana umowy = jeden rekord. Ogłoszenie o wykonaniu umowy zawiera pełną, ponumerowaną listę zmian;
+ * każda z nich mogła być wcześniej opublikowana jako osobne ogłoszenie o zmianie umowy (tam zawsze bez numeru).
+ * Łączymy je po kwocie (albo przyczynie i opisie). Głównym źródłem zostaje ogłoszenie o zmianie umowy — ma datę
+ * zmiany i pełny opis aneksu; ogłoszenie o wykonaniu trafia do źródeł powiązanych.
+ */
+export function mergeChanges(performing: StoredNotice | undefined, updates: StoredNotice[]) {
+  const drafts: ChangeDraft[] = (performing?.parsed.changes ?? []).map((change, i) => ({
+    no: change.changeNo ?? i + 1,
+    change: { ...change },
+    sourceId: performing!.sourceId,
+    related: [],
+    claimed: false,
+  }));
+  const ordered = [...updates].sort((x, y) => x.notice.publicationDate.localeCompare(y.notice.publicationDate));
+  for (const upd of ordered) {
+    for (const change of upd.parsed.changes ?? []) {
+      const match = drafts.find((d) => !d.claimed && d.sourceId !== upd.sourceId && sameChange(d.change, change));
+      if (match) {
+        match.claimed = true;
+        match.related = [...new Set([...match.related, match.sourceId])];
+        match.sourceId = upd.sourceId;
+        match.change = {
+          ...match.change,
+          changedAt: change.changedAt ?? match.change.changedAt,
+          legalBasis: change.legalBasis ?? match.change.legalBasis,
+          reason: change.reason ?? match.change.reason,
+          description: change.description ?? match.change.description,
+          valueChange: match.change.valueChange ?? change.valueChange,
+        };
+      } else {
+        drafts.push({ no: Math.max(0, ...drafts.map((d) => d.no)) + 1, change: { ...change }, sourceId: upd.sourceId, related: [], claimed: true });
+      }
+    }
+  }
+  return drafts.map(({ no, change, sourceId, related }) => ({ no, change, sourceId, related }));
+}
+
+/**
+ * Zapis zmian umowy z zachowaniem identyfikatorów (po numerze zmiany): na identyfikatorze zmiany opierają się
+ * propozycje zdarzeń i decyzje eksperta. Duplikaty z wcześniejszych wersji (ta sama zmiana z kilku ogłoszeń) usuwamy.
+ */
+async function saveChanges(contractId: string, rows: (Record<string, unknown> & { change_no: number })[]) {
+  const { data: existing } = await db().from("rm_contract_changes").select("id,change_no").eq("contract_id", contractId).order("created_at");
+  const keep = new Map<number, string>();
+  const drop: string[] = [];
+  for (const e of existing ?? []) {
+    const no = e.change_no as number;
+    if (rows.some((r) => r.change_no === no) && !keep.has(no)) keep.set(no, e.id as string);
+    else drop.push(e.id as string);
+  }
+  if (drop.length) {
+    const { error } = await db().from("rm_contract_changes").delete().in("id", drop);
+    if (error) throw new Error(`Usuwanie zdublowanych zmian umowy: ${error.message}`);
+  }
+  for (const row of rows) {
+    const id = keep.get(row.change_no);
+    const { error } = id ? await db().from("rm_contract_changes").update(row).eq("id", id) : await db().from("rm_contract_changes").insert(row);
+    if (error) throw new Error(`Zapis zmian umowy: ${error.message}`);
+  }
+}
 
 /**
  * Krok 3: odtworzenie umów i zmian z ogłoszeń + odchylenia kosztu i czasu.
@@ -223,10 +325,8 @@ async function buildContracts(procurementId: string, notices: StoredNotice[]) {
     if (error) throw new Error(`Zapis umowy: ${error.message}`);
     const contractId = data.id as string;
 
-    const changes: { change: ParsedContractChange; sourceId: string; no: number }[] = [];
-    d.performing?.parsed.changes?.forEach((change, i) => changes.push({ change, sourceId: d.performing!.sourceId, no: change.changeNo ?? i + 1 }));
-    d.updates.forEach((upd) => upd.parsed.changes?.forEach((change) => changes.push({ change, sourceId: upd.sourceId, no: 1 })));
-    const rows = changes.map(({ change, sourceId, no }) => ({
+    const merged = mergeChanges(d.performing, d.updates);
+    const rows = merged.map(({ change, sourceId, related, no }) => ({
       contract_id: contractId,
       change_no: no,
       changed_at: change.changedAt,
@@ -235,12 +335,11 @@ async function buildContracts(procurementId: string, notices: StoredNotice[]) {
       description: change.description,
       value_change: change.valueChange,
       price_increase: change.priceIncrease,
+      new_end_date: extractNewEndDate(`${change.description ?? ""} ${change.reason ?? ""}`),
       source_id: sourceId,
+      related_source_ids: related,
     }));
-    if (rows.length) {
-      const { error: changeError } = await db().from("rm_contract_changes").upsert(rows, { onConflict: "contract_id,source_id,change_no" });
-      if (changeError) throw new Error(`Zapis zmian umowy: ${changeError.message}`);
-    }
+    await saveChanges(contractId, rows);
     built.push({ contractId, changesCount: rows.length, notices: used });
   }
   return built;
@@ -248,56 +347,44 @@ async function buildContracts(procurementId: string, notices: StoredNotice[]) {
 
 export type EnrichResult = { projectId: string; procurements: number; notices: number; changes: number; events: number; log: LogEntry[] };
 
-/** Pełne, powtarzalne wzbogacenie projektu. Można uruchamiać wielokrotnie (upserty po identyfikatorach). */
-export async function enrichProject(projectId: string): Promise<EnrichResult> {
-  const { data: project, error } = await db().from("rm_projects").select("*").eq("id", projectId).single();
-  if (error || !project) throw new Error(`Nie znaleziono projektu ${projectId}.`);
+type StoreCandidate = { notice: BzpNotice; method: string; confidence: number; basis: string[] };
 
-  const log: LogEntry[] = [];
-  const candidates = await findContractNotices(project as Project, log);
-  let noticesCount = 0;
-  let changesCount = 0;
-  let eventsCount = 0;
+/**
+ * Zapis dopasowanego postępowania z wszystkimi ogłoszeniami (po OCID): rm_procurements, rm_sources, rm_notices.
+ * Zwraca liczbę zapisanych ogłoszeń. `status` wymusza decyzję (np. ręczne wskazanie przez eksperta).
+ */
+async function storeProcurement(projectId: string, candidate: StoreCandidate, log: LogEntry[], status?: "accepted" | "proposed"): Promise<number> {
+  const cn = candidate.notice;
+  const { data: existing } = await db().from("rm_procurements").select("id,status").eq("project_id", projectId).eq("ocid", cn.tenderId).maybeSingle();
 
-  const { data: catalog } = await db().from("rm_risk_catalog").select("*").eq("approved", true);
+  const { data: proc, error: procError } = await db()
+    .from("rm_procurements")
+    .upsert(
+      {
+        project_id: projectId,
+        ocid: cn.tenderId,
+        bzp_number: cn.bzpNumber,
+        title: cn.orderObject,
+        buyer_name: cn.organizationName,
+        buyer_nip: cn.organizationNationalId,
+        cpv: cn.cpvCode,
+        match_method: candidate.method,
+        match_confidence: Math.round(candidate.confidence * 100) / 100,
+        match_basis: candidate.basis,
+        // decyzji eksperta nie nadpisujemy; pewne dopasowanie po numerze i NIP akceptujemy automatycznie
+        status: status ?? existing?.status ?? (candidate.confidence >= 1 ? "accepted" : "proposed"),
+      },
+      { onConflict: "project_id,ocid" },
+    )
+    .select("id")
+    .single();
+  if (procError) throw new Error(`Zapis postępowania: ${procError.message}`);
 
-  for (const candidate of candidates) {
-    const cn = candidate.notice;
-    const { data: existing } = await db()
-      .from("rm_procurements")
-      .select("id,status")
-      .eq("project_id", projectId)
-      .eq("ocid", cn.tenderId)
-      .maybeSingle();
-
-    const { data: proc, error: procError } = await db()
-      .from("rm_procurements")
-      .upsert(
-        {
-          project_id: projectId,
-          ocid: cn.tenderId,
-          bzp_number: cn.bzpNumber,
-          title: cn.orderObject,
-          buyer_name: cn.organizationName,
-          buyer_nip: cn.organizationNationalId,
-          cpv: cn.cpvCode,
-          match_method: candidate.method,
-          match_confidence: Math.round(candidate.confidence * 100) / 100,
-          match_basis: candidate.basis,
-          // decyzji eksperta nie nadpisujemy; pewne dopasowanie po numerze i NIP akceptujemy automatycznie
-          status: existing?.status ?? (candidate.confidence >= 1 ? "accepted" : "proposed"),
-        },
-        { onConflict: "project_id,ocid" },
-      )
-      .select("id")
-      .single();
-    if (procError) throw new Error(`Zapis postępowania: ${procError.message}`);
-
-    const related = await findRelated(cn, log);
-    const stored: StoredNotice[] = [];
-    for (const { notice, query } of [{ notice: cn, query: { NoticeType: "ContractNotice" } as BzpQuery }, ...related]) {
+  const related = await findRelated(cn, log);
+  // Zapis ogłoszeń równolegle (każde: źródło + rekord ogłoszenia).
+  await Promise.all(
+    [{ notice: cn, query: { NoticeType: "ContractNotice" } as BzpQuery }, ...related].map(async ({ notice, query }) => {
       const { id: sourceId, text } = await upsertSource(notice, query);
-      const parsed = parseNotice(notice.noticeType, text);
       const { error: noticeError } = await db()
         .from("rm_notices")
         .upsert(
@@ -307,30 +394,155 @@ export async function enrichProject(projectId: string): Promise<EnrichResult> {
             notice_number: notice.noticeNumber,
             published_at: notice.publicationDate,
             title: notice.orderObject,
-            parsed,
+            parsed: parseNotice(notice.noticeType, text),
             source_id: sourceId,
           },
-          { onConflict: "notice_number" },
+          { onConflict: "procurement_id,notice_number" },
         );
       if (noticeError) throw new Error(`Zapis ogłoszenia: ${noticeError.message}`);
-      stored.push({ notice, parsed, sourceId, text });
-    }
-    noticesCount += stored.length;
+    }),
+  );
+  return related.length + 1;
+}
+
+/**
+ * Ręczne wskazanie przetargu przez eksperta (modyfikacja połączenia): numer ogłoszenia o zamówieniu w BZP.
+ * Dotychczasowe dopasowania projektu zostają odrzucone, wskazane jest zatwierdzane, a dane przeliczane od nowa.
+ */
+export async function assignProcurement(projectId: string, rawNumber: string, add = false) {
+  const { data: project, error } = await db().from("rm_projects").select("*").eq("id", projectId).single();
+  if (error || !project) throw new Error(`Nie znaleziono projektu ${projectId}.`);
+  const number = normalizeNoticeNumber(rawNumber);
+  if (!number) throw new Error("Podaj numer ogłoszenia w formacie RRRR/BZP NNNNNNNN/WW, np. 2022/BZP 00058537/01.");
+
+  const log: LogEntry[] = ((project as Project).enrichment_log ?? []) as LogEntry[];
+  const query: BzpQuery = { NoticeType: "ContractNotice", NoticeNumber: number };
+  const [notice] = await searchNotices(query, 1);
+  log.push({ at: new Date().toISOString(), step: "Ręczne wskazanie przetargu", detail: number, url: noticeUrl(query), count: notice ? 1 : 0 });
+  if (!notice) throw new Error(`W BZP nie ma ogłoszenia o zamówieniu ${number}. Podaj numer ogłoszenia o zamówieniu (nie o wyniku ani o wykonaniu umowy).`);
+
+  const nip = normalizeNip((project as Project).beneficiary_nip);
+  const nipOk = Boolean(nip && normalizeNip(notice.organizationNationalId) === nip);
+  const basis = [`${add ? "dodane przez eksperta jako kolejne zamówienie inwestycji" : "wskazane ręcznie przez eksperta"}: ${number}`, nipOk ? `NIP zamawiającego zgodny (${nip})` : `NIP zamawiającego różny: projekt ${(project as Project).beneficiary_nip ?? "—"}, BZP ${notice.organizationNationalId}`];
+
+  const { data: previous } = await db().from("rm_procurements").select("id,ocid,status").eq("project_id", projectId).neq("status", "rejected");
+  // Kolejne zamówienie tej samej inwestycji (np. osobny przetarg na sieć i na oczyszczalnię) — dotychczasowe zostają.
+  const toReject = add ? [] : (previous ?? []).filter((p) => p.ocid !== notice.tenderId).map((p) => p.id as string);
+  if (toReject.length) await db().from("rm_procurements").update({ status: "rejected" }).in("id", toReject);
+
+  const notices = await storeProcurement(projectId, { notice, method: "manual", confidence: nipOk ? 1 : 0.8, basis }, log, "accepted");
+  await db().from("rm_projects").update({ enrichment_log: log, updated_at: new Date().toISOString() }).eq("id", projectId);
+  const built = await buildProjectRecords(projectId);
+  return { bzpNumber: notice.bzpNumber, title: notice.orderObject, nipOk, notices, rejected: toReject, ...built };
+}
+
+export type SearchResult = {
+  projectId: string;
+  procurements: number;
+  notices: number;
+  /** Najlepsze dopasowanie: metoda i pewność (do komunikatu dla użytkownika). */
+  best: { method: string; confidence: number; bzpNumber: string } | null;
+  log: LogEntry[];
+};
+
+/**
+ * Faza 1 — wyszukiwanie w źródłach publicznych: dopasowanie projektu do postępowania w BZP i pobranie
+ * wszystkich ogłoszeń tego postępowania (po OCID). Zapisuje rm_procurements, rm_sources, rm_notices.
+ */
+export async function searchSources(projectId: string): Promise<SearchResult> {
+  const { data: project, error } = await db().from("rm_projects").select("*").eq("id", projectId).single();
+  if (error || !project) throw new Error(`Nie znaleziono projektu ${projectId}.`);
+
+  const log: LogEntry[] = [];
+  const candidates = await findContractNotices(project as Project, log);
+  let noticesCount = 0;
+
+  for (const candidate of candidates) {
+    noticesCount += await storeProcurement(projectId, candidate, log);
+  }
+
+  if (!candidates.length) log.push({ at: new Date().toISOString(), step: "Wynik", detail: "Nie znaleziono ogłoszenia — wymaga ręcznego wskazania przez eksperta." });
+  await db().from("rm_projects").update({ enrichment_log: log, updated_at: new Date().toISOString() }).eq("id", projectId);
+
+  const top = candidates[0];
+  return {
+    projectId,
+    procurements: candidates.length,
+    notices: noticesCount,
+    best: top ? { method: top.method, confidence: Math.round(top.confidence * 100) / 100, bzpNumber: top.notice.bzpNumber } : null,
+    log,
+  };
+}
+
+export type BuildResult = {
+  projectId: string;
+  contracts: number;
+  changes: number;
+  events: number;
+  costDeviationPct: number | null;
+  delayDays: number | null;
+  /** Projekt ma tylko niepotwierdzone dopasowanie — wzbogacanie czeka na decyzję eksperta. */
+  pendingMatch: boolean;
+  /** Wynik sprawdzenia źródeł dodatkowych (strona postępowania, TED). */
+  external: { source: string; status: string }[];
+};
+
+/** Usuwa nieocenione propozycje zdarzeń z umów postępowań, które nie są zatwierdzone (decyzje eksperta zostają). */
+export async function dropUnconfirmedEvents(procurementIds: string[]) {
+  if (!procurementIds.length) return;
+  const { data: contracts } = await db().from("rm_contracts").select("id").in("procurement_id", procurementIds);
+  const ids = (contracts ?? []).map((c) => c.id as string);
+  if (ids.length) await db().from("rm_risk_events").delete().in("contract_id", ids).eq("status", "proposed");
+}
+
+/**
+ * Faza 2 — wzbogacanie: z zapisanych ogłoszeń (bez ponownych zapytań do BZP) odtwarza umowy, zmiany umów,
+ * odchylenia kosztu i czasu oraz proponuje zdarzenia ryzyka regułami.
+ */
+export async function buildProjectRecords(projectId: string): Promise<BuildResult> {
+  const supabase = db();
+  const { data: project, error } = await supabase.from("rm_projects").select("*").eq("id", projectId).single();
+  if (error || !project) throw new Error(`Nie znaleziono projektu ${projectId}.`);
+  const log = ((project as Project).enrichment_log ?? []) as LogEntry[];
+
+  const [{ data: catalog }, { data: allProcs }] = await Promise.all([
+    supabase.from("rm_risk_catalog").select("*").eq("approved", true),
+    supabase.from("rm_procurements").select("id,status").eq("project_id", projectId).order("match_confidence", { ascending: false }),
+  ]);
+  // Wzbogacamy wyłącznie zatwierdzone dopasowania (pewne 100% albo potwierdzone przez eksperta).
+  // Niepotwierdzone mogą dotyczyć cudzego przetargu — nie liczymy z nich umowy, kosztu, czasu ani zdarzeń.
+  const procs = (allProcs ?? []).filter((p) => p.status === "accepted");
+  await dropUnconfirmedEvents((allProcs ?? []).filter((p) => p.status !== "accepted").map((p) => p.id as string));
+  const pendingMatch = !procs.length && (allProcs ?? []).some((p) => p.status === "proposed");
+
+  let contractsCount = 0;
+  let changesCount = 0;
+  let eventsCount = 0;
+  let headline: { cost: number | null; delay: number | null } | null = null;
+  const scopePart = Number((project as Project).record_scope?.match(/część\s*(\d+)/i)?.[1] ?? 0);
+
+  for (const proc of procs) {
+    const { data: rows } = await supabase.from("rm_notices").select("notice_type,parsed,source_id, rm_sources!inner(raw,text_content)").eq("procurement_id", proc.id);
+    const stored: StoredNotice[] = (rows ?? []).map((r) => {
+      const src = (Array.isArray(r.rm_sources) ? r.rm_sources[0] : r.rm_sources) as { raw: BzpNotice; text_content: string | null };
+      return { notice: { ...src.raw, noticeType: r.notice_type }, parsed: r.parsed as ParsedNotice, sourceId: r.source_id, text: src.text_content ?? "" };
+    });
 
     const built = await buildContracts(proc.id, stored);
+    contractsCount += built.length;
     // Rekord „część N”: zdarzenia proponujemy tylko dla umowy tej części (pozostałe części zostają jako kontekst).
-    const scopePart = Number((project as Project).record_scope?.match(/część\s*(\d+)/i)?.[1] ?? 0);
-    const { data: partRows } = await db().from("rm_contracts").select("id,part_no").eq("procurement_id", proc.id);
+    const { data: partRows } = await supabase.from("rm_contracts").select("id,part_no,cost_deviation_pct,delay_days").eq("procurement_id", proc.id);
     const hasScopePart = scopePart > 0 && (partRows ?? []).some((r) => r.part_no === scopePart);
     for (const contract of built) {
-      const partNo = (partRows ?? []).find((r) => r.id === contract.contractId)?.part_no;
-      if (hasScopePart && partNo !== scopePart) continue;
+      const row = (partRows ?? []).find((r) => r.id === contract.contractId);
+      if (hasScopePart && row?.part_no !== scopePart) continue;
+      headline ??= { cost: row?.cost_deviation_pct ?? null, delay: row?.delay_days ?? null };
       changesCount += contract.changesCount;
       eventsCount += await proposeRuleEvents({
         projectId,
         contractId: contract.contractId,
         catalog: (catalog ?? []) as CatalogEntry[],
-        notices: contract.notices.map((s) => ({ type: s.notice.noticeType, sourceId: s.sourceId, text: s.text })),
+        notices: contract.notices.map((n) => ({ type: n.notice.noticeType, sourceId: n.sourceId, text: n.text })),
       });
     }
     if (!built.length) {
@@ -338,12 +550,21 @@ export async function enrichProject(projectId: string): Promise<EnrichResult> {
     }
   }
 
-  if (!candidates.length) log.push({ at: new Date().toISOString(), step: "Wynik", detail: "Nie znaleziono ogłoszenia — wymaga ręcznego wskazania przez eksperta." });
+  // Źródła dodatkowe (strona postępowania zamawiającego, TED) — po odtworzeniu umowy, żeby sprawdzić krzyżowo jej wartość.
+  let external: ExternalCheckRow[] = [];
+  try {
+    external = await checkExternalSources(projectId, log);
+  } catch (error) {
+    log.push({ at: new Date().toISOString(), step: "Źródła dodatkowe", detail: `błąd: ${error instanceof Error ? error.message : String(error)}` });
+  }
 
-  await db()
-    .from("rm_projects")
-    .update({ enriched_at: new Date().toISOString(), enrichment_log: log, updated_at: new Date().toISOString() })
-    .eq("id", projectId);
+  await supabase.from("rm_projects").update({ enriched_at: new Date().toISOString(), enrichment_log: log, updated_at: new Date().toISOString() }).eq("id", projectId);
+  return { projectId, external: external.map((e) => ({ source: e.source, status: e.status })), contracts: contractsCount, changes: changesCount, events: eventsCount, costDeviationPct: headline?.cost ?? null, delayDays: headline?.delay ?? null, pendingMatch };
+}
 
-  return { projectId, procurements: candidates.length, notices: noticesCount, changes: changesCount, events: eventsCount, log };
+/** Pełne, powtarzalne wzbogacenie projektu = wyszukiwanie + wzbogacanie. Upserty po identyfikatorach. */
+export async function enrichProject(projectId: string): Promise<EnrichResult> {
+  const search = await searchSources(projectId);
+  const build = await buildProjectRecords(projectId);
+  return { projectId, procurements: search.procurements, notices: search.notices, changes: build.changes, events: build.events, log: search.log };
 }

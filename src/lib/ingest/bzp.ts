@@ -56,9 +56,9 @@ export function noticeUrl(query: BzpQuery): string {
   return `${bzpBaseUrl}${API_PATH}?${params}`;
 }
 
-/** Publiczny podgląd ogłoszenia (dla jury i eksperta). */
-export function noticePublicUrl(noticeNumber: string): string {
-  return `https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/${encodeURIComponent(noticeNumber)}`;
+/** Publiczny podgląd ogłoszenia w e-Zamówieniach (dla jury i eksperta) — po identyfikatorze obiektu z API BZP. */
+export function noticePublicUrl(objectId: string): string {
+  return `https://ezamowienia.gov.pl/mo-client-board/bzp/notice-details/id/${encodeURIComponent(objectId)}`;
 }
 
 async function fetchPage(query: BzpQuery): Promise<BzpNotice[]> {

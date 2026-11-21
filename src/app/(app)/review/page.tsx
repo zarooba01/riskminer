@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { ReviewView } from "@/components/screens/review-view";
 import { requireUser } from "@/lib/auth/session";
-import { decideCatalog, decideProcurement, decideRiskEvent, editRiskEvent, toggleExemplary } from "@/lib/rm/actions";
+import { assignProcurementAction, decideCatalog, decideProcurement, decideRiskEvent, editRiskEvent, toggleExemplary } from "@/lib/rm/actions";
 import { databaseConfigured, getReviewQueue } from "@/lib/rm/queries";
 
 export const metadata: Metadata = { title: "Weryfikacja" };
@@ -16,6 +16,7 @@ export default async function ReviewPage() {
       data={data}
       eventActions={{ decide: decideRiskEvent, edit: editRiskEvent, exemplary: toggleExemplary }}
       decideProcurement={decideProcurement}
+      assignProcurement={assignProcurementAction}
       decideCatalog={decideCatalog}
     />
   );

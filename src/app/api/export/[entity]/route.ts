@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: RouteContext<"/api/expor
   const project = url.searchParams.get("project");
 
   let query = db().from(spec.table).select(spec.select).limit(10000);
-  if (project && ["rm_procurements", "rm_risk_events", "rm_llm_runs"].includes(spec.table)) query = query.eq("project_id", project);
+  if (project && ["rm_procurements", "rm_risk_events", "rm_llm_runs", "rm_documents", "rm_document_findings", "rm_external_checks", "rm_change_reports"].includes(spec.table)) query = query.eq("project_id", project);
   if (project && spec.table === "rm_projects") query = query.eq("id", project);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

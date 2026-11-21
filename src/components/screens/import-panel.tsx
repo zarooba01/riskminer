@@ -45,13 +45,13 @@ export function ImportPanel({ projectIds, importAction, enrichAction }: ImportPa
           <CardTitle className="flex items-center gap-2">
             <FileUpIcon className="size-4" aria-hidden /> 1. Import rekordów
           </CardTitle>
-          <CardDescription>Plik XLSX w formacie organizatora. Bez pliku wczytamy dołączony zestaw 22 projektów.</CardDescription>
+          <CardDescription>Plik XLSX/CSV w formacie organizatora. Bez pliku wczytamy dołączony zestaw 22 projektów.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={formAction} className="flex flex-col gap-3">
             <Field>
-              <FieldLabel htmlFor="file">Plik .xlsx (opcjonalnie)</FieldLabel>
-              <Input id="file" name="file" type="file" accept=".xlsx" />
+              <FieldLabel htmlFor="file">Plik .xlsx lub .csv (opcjonalnie)</FieldLabel>
+              <Input id="file" name="file" type="file" accept=".xlsx,.csv" />
               <FieldDescription>Ponowny import aktualizuje rekordy o tym samym identyfikatorze.</FieldDescription>
             </Field>
             <Button type="submit" disabled={importing}>

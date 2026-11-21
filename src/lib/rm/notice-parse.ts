@@ -290,3 +290,22 @@ export function addMonths(isoDate: string, monthsCount: number): string {
 export function daysBetween(fromIso: string, toIso: string): number {
   return Math.round((Date.parse(`${toIso}T00:00:00Z`) - Date.parse(`${fromIso}T00:00:00Z`)) / 86_400_000);
 }
+
+const polishMonths = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"];
+
+/**
+ * Nowy termin wykonania z opisu zmiany umowy, np. „termin wykonania przedmiotu umowy został wydłużony do dnia 26.05.2026 r.”.
+ * Zwraca datę ISO albo null, gdy opis nie podaje konkretnej daty (np. „o 3 miesiące”).
+ */
+export function extractNewEndDate(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const m = text.match(/termin\w*[^.;]{0,220}?\bdo(?:\s+dnia)?\s+(\d{1,2}[./-]\d{1,2}[./-]\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4})/i);
+  if (!m) return null;
+  const raw = m[1];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const numeric = raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (numeric) return `${numeric[3]}-${numeric[2].padStart(2, "0")}-${numeric[1].padStart(2, "0")}`;
+  const words = raw.match(/^(\d{1,2})\s+([a-ząćęłńóśźż]+)\s+(\d{4})$/i);
+  const month = words ? polishMonths.indexOf(words[2].toLowerCase()) : -1;
+  return words && month >= 0 ? `${words[3]}-${String(month + 1).padStart(2, "0")}-${words[1].padStart(2, "0")}` : null;
+}
