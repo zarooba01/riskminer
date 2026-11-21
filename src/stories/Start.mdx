@@ -1,0 +1,58 @@
+import { Meta } from "@storybook/addon-docs/blocks";
+
+<Meta title="Start" />
+
+# Design system
+
+Wszystko, z czego składamy ekrany. Zanim napiszesz nowy komponent, sprawdź, czy nie ma go tutaj.
+
+**design** — kolory, typografia, odstępy, promienie, cienie. Źródło: rejestr historii shadcn.
+
+**ui** — przyciski, pola, karty, dialogi, tabele. Źródło: shadcn/ui (`src/components/ui`).
+
+**Komponenty** — nagłówek strony, kafelek statystyki, nawigacja. Własne (`src/components/layout`).
+
+**Wzorce** — stany: ładowanie, pusto, błąd. Własne.
+
+**Makiety** — całe ekrany na danych przykładowych, desktop i telefon. Bloki shadcn + własne (`src/components/screens`).
+
+## Zmiana wyglądu po poznaniu wyzwania
+
+**1.** `src/styles/tokens.css` — zmień `--brand` (trzecia liczba to odcień 0–360) i ewentualnie `--radius`.
+
+**2.** `src/app/layout.tsx` — podmień font.
+
+**3.** `src/lib/config.ts` — nazwa aplikacji i pozycje nawigacji.
+
+**4.** `public/icons/icon.svg` + `npm run icons` — logo i ikony PWA.
+
+Przełącznik motywu (jasny/ciemny), rozmiaru ekranu i **wariantu** design systemu jest na pasku narzędzi u góry.
+
+## Warianty
+
+Poza domyślnym są dwa gotowe warianty z tweakcn.com: **Northern Lights** i **Nature**. Przełącznik „Wariant” (ikona pędzla)
+zmienia kolory, fonty, promienie i cienie we wszystkich historiach; *Fundamenty → Porównanie wariantów* pokazuje je obok siebie.
+W aplikacji wariant wybiera zmienna `NEXT_PUBLIC_THEME`.
+
+## Inne design systemy
+
+Poza shadcn/ui są trzy piaskownice z zupełnie innymi systemami — te same makiety (Logowanie, Strona bazowa, Pulpit, Lista)
+na tych samych danych. Znajdziesz je niżej w menu bocznym jako osobne sekcje: **HeroUI**, **MUI (Material)** i **Fluent UI**.
+
+Kod leży w `design-systems/<nazwa>` i jest odseparowany od aplikacji; opis w `design-systems/README.md`.
+W trybie deweloperskim sekcje pojawiają się po uruchomieniu `npm run storybook:all`.
+
+Przełączniki Jasny/Ciemny i „Wariant” z tego paska narzędzi nie działają na piaskownice. Tryb ciemny piaskownicy
+zobaczysz po otwarciu jej bezpośrednio — ikona globusa przy nazwie sekcji w menu.
+
+## Dodawanie komponentów
+
+```bash
+npx shadcn@latest add calendar                      # komponent
+npx shadcn@latest add @storybook/calendar-story     # gotowa historia do niego
+```
+
+## Nowy ekran
+
+Skopiuj najbliższą makietę z `src/components/screens`, podmień dane i dodaj stronę w `src/app/(app)/`.
+Ekran przyjmuje dane przez propsy, więc od razu ma historię w Storybooku.

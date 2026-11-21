@@ -1,0 +1,5 @@
+/* Fluent nie ma własnego resetu strony — tylko to, czego potrzebują makiety pełnoekranowe. */
+html,
+body {
+  margin: 0;
+}

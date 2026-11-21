@@ -1,0 +1,4 @@
+# Deploy zawiera samą aplikację — lokalnie zbudowane Storybooki i wyniki testów nie są wysyłane.
+public/storybook
+test-results
+playwright-report

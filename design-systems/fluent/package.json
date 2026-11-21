@@ -1,0 +1,26 @@
+{
+  "name": "@hacknation/ds-fluent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev -p 6009 --no-open --disable-telemetry",
+    "build-storybook": "storybook build -o ../../public/storybook/ds/fluent --disable-telemetry",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fluentui/react-components": "^9.75.2",
+    "@fluentui/react-icons": "^2.0.300",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.6.7",
+    "@storybook/addon-themes": "^10.6.7",
+    "@storybook/react-vite": "^10.6.7",
+    "@vitejs/plugin-react": "*",
+    "storybook": "^10.6.7",
+    "typescript": "^5",
+    "vite": "*"
+  }
+}

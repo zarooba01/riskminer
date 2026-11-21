@@ -1,0 +1,3 @@
+/* Style piaskownicy HeroUI. Motyw zmienia się przez nadpisanie zmiennych (--accent, --radius…) poniżej importów. */
+@import "tailwindcss";
+@import "@heroui/styles";

@@ -1,0 +1,10 @@
+{
+  "extends": "../shared/tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@sample-data": ["../../src/lib/sample-data.ts"],
+      "@shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["src", ".storybook", "../shared/*.ts"]
+}
