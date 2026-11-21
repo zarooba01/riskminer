@@ -1,6 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { AssessmentDetailView } from "@/components/screens/assessment-detail-view";
+import { AssessmentsView } from "@/components/screens/assessments-view";
+import { MethodologyView } from "@/components/screens/methodology-view";
+import { NewAssessmentView } from "@/components/screens/new-assessment-view";
+import { ReferenceBaseView } from "@/components/screens/reference-base-view";
 import { DashboardView } from "@/components/screens/dashboard-view";
 import { ExportView } from "@/components/screens/export-view";
 import { LlmView } from "@/components/screens/llm-view";
@@ -11,6 +16,7 @@ import { SourceView } from "@/components/screens/source-view";
 import { Toaster } from "@/components/ui/sonner";
 
 import { demoUser, fakeResult, phone } from "./helpers";
+import { sampleAssessment, sampleAssessments } from "./rm-assessment-sample";
 import { sampleCatalog, sampleDetail, sampleProjects, sampleReview, sampleSource } from "./rm-sample";
 
 const path = (pathname: string) => ({ nextjs: { navigation: { pathname } } });
@@ -126,3 +132,48 @@ export const Eksport: Story = {
     />
   ),
 };
+
+export const NowaInwestycja: Story = {
+  name: "Nowa inwestycja — formularz",
+  parameters: path("/assessments/new"),
+  render: () => <NewAssessmentView model="anthropic/claude-haiku-5.5" region="USA (Anthropic)" />,
+};
+export const NowaInwestycjaTelefon: Story = { ...NowaInwestycja, ...phone, name: "Nowa inwestycja (telefon)" };
+
+export const ZapisaneOceny: Story = {
+  name: "Zapisane oceny",
+  parameters: path("/assessments"),
+  render: () => <AssessmentsView assessments={sampleAssessments} remove={fakeResult()} />,
+};
+export const ZapisaneOcenyTelefon: Story = { ...ZapisaneOceny, ...phone, name: "Zapisane oceny (telefon)" };
+
+export const OcenaInwestycji: Story = {
+  name: "Ocena inwestycji — wynik",
+  parameters: path("/assessments"),
+  render: () => <AssessmentDetailView data={sampleAssessment} model="anthropic/claude-haiku-5.5" region="USA (Anthropic)" rerun={fakeResult()} saveParams={fakeResult()} decide={fakeResult()} />,
+};
+export const OcenaInwestycjiTelefon: Story = { ...OcenaInwestycji, ...phone, name: "Ocena inwestycji (telefon)" };
+
+export const Obliczenia: Story = {
+  parameters: path("/methodology"),
+  render: () => <MethodologyView corpus={23} />,
+};
+export const ObliczeniaTelefon: Story = { ...Obliczenia, ...phone, name: "Obliczenia (telefon)" };
+
+export const BazaPorownawcza: Story = {
+  name: "Baza porównawcza",
+  parameters: path("/reference"),
+  render: () => (
+    <ReferenceBaseView
+      rebuild={fakeResult()}
+      data={{
+        lastBuild: { at: "2026-11-21T22:40:00Z", skipped: [{ projectId: "RM-2026-022", reason: "brak zdarzeń ryzyka w źródłach" }] },
+        cases: [
+          { project_id: "RM-2026-001", title: "Budowa rurociągu tłocznego kanalizacji sanitarnej Godzikowice – Jaczkowice", beneficiary_name: "Gmina Oława", province: "dolnośląskie", subsector_main: "Kanalizacja sanitarna", works_type: "budowa/rozbudowa", value: 2107348, paid: 2246178, cost_deviation_pct: 6.59, months: 12, delay_days: 77, bzp_number: "2023/BZP 00123456", match_confidence: 1, match_origin: "accepted", snapshot_at: "2026-11-21T22:40:00Z", events: 8, risk_codes: ["R06", "R07"] },
+          { project_id: "RM-2026-017", title: "Budowa sieci kanalizacji sanitarnej wraz z przyłączami w miejscowości Tanibórz", beneficiary_name: "Gmina Kleszczewo", province: "wielkopolskie", subsector_main: "Kanalizacja sanitarna", works_type: "budowa/rozbudowa", value: 4275776, paid: 5422900, cost_deviation_pct: 26.83, months: 4, delay_days: 53, bzp_number: "2025/BZP 00358528", match_confidence: 0.95, match_origin: "auto", snapshot_at: "2026-11-21T22:40:00Z", events: 3, risk_codes: ["R06", "R07"] },
+        ],
+      }}
+    />
+  ),
+};
+export const BazaPorownawczaTelefon: Story = { ...BazaPorownawcza, ...phone, name: "Baza porównawcza (telefon)" };

@@ -22,6 +22,7 @@ export type SourceViewData = {
 const kindLabel: Record<string, string> = {
   bzp: "Ogłoszenie BZP (e-Zamówienia)",
   upload: "Dokument dodany przez eksperta",
+  assessment: "Dokument planowanej inwestycji",
   platform: "Strona postępowania zamawiającego",
   ted: "TED (Dziennik Urzędowy UE)",
   xlsx: "Plik organizatora",

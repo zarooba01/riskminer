@@ -1,4 +1,4 @@
-import { BotIcon, CalculatorIcon, FileTextIcon, UserCheckIcon } from "lucide-react";
+import { BotIcon, CalculatorIcon, FileTextIcon, PencilLineIcon, UserCheckIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,6 +10,7 @@ const kinds = {
   rule: { label: "Reguła", icon: CalculatorIcon, hint: "Propozycja reguły na podstawie katalogu ekspertów — wymaga zatwierdzenia.", variant: "secondary" },
   llm: { label: "Model AI", icon: BotIcon, hint: "Wniosek modelu językowego — wymaga zatwierdzenia przez eksperta.", variant: "default" },
   expert: { label: "Ekspert", icon: UserCheckIcon, hint: "Wpis lub decyzja eksperta.", variant: "outline" },
+  input: { label: "Dane użytkownika", icon: PencilLineIcon, hint: "Informacja podana w opisie planowanej inwestycji — wymaga lokalnego potwierdzenia.", variant: "outline" },
 } as const;
 
 export type ProvenanceKind = keyof typeof kinds;

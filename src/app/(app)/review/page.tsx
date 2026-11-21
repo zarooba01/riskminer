@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { ReviewView } from "@/components/screens/review-view";
 import { requireUser } from "@/lib/auth/session";
-import { assignProcurementAction, decideCatalog, decideProcurement, decideRiskEvent, editRiskEvent, toggleExemplary } from "@/lib/rm/actions";
+import { assignProcurementAction, decideCatalog, editCatalogGuidance, decideProcurement, decideRiskEvent, editRiskEvent, toggleExemplary } from "@/lib/rm/actions";
 import { databaseConfigured, getReviewQueue } from "@/lib/rm/queries";
 
 export const metadata: Metadata = { title: "Weryfikacja" };
@@ -18,6 +18,7 @@ export default async function ReviewPage() {
       decideProcurement={decideProcurement}
       assignProcurement={assignProcurementAction}
       decideCatalog={decideCatalog}
+      editGuidance={editCatalogGuidance}
     />
   );
 }

@@ -137,6 +137,10 @@ export type CatalogEntry = {
   keywords: string[];
   approved: boolean;
   proposed_by: string;
+  /** Wiedza ekspercka do oceny nowej inwestycji: co sprawdzić przed przetargiem, działania, zapisy umowne. */
+  checks?: string[];
+  actions?: string[];
+  clauses?: string[];
 };
 
 export type LlmRun = {

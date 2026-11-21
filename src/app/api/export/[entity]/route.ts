@@ -5,7 +5,7 @@ import { db } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/export/<encja>?format=csv|json[&project=RM-2026-001] — rekordy do filtrowania i dalszej pracy. */
+/** GET /api/export/<encja>?format=csv|json[&project=RM-2026-001][&assessment=<id oceny>] — rekordy do filtrowania i dalszej pracy. */
 export async function GET(request: Request, { params }: RouteContext<"/api/export/[entity]">) {
   const { entity } = await params;
   const spec = exportEntities[entity as ExportEntity];
@@ -14,10 +14,13 @@ export async function GET(request: Request, { params }: RouteContext<"/api/expor
   const url = new URL(request.url);
   const format = url.searchParams.get("format") === "csv" ? "csv" : "json";
   const project = url.searchParams.get("project");
+  const assessment = url.searchParams.get("assessment");
 
   let query = db().from(spec.table).select(spec.select).limit(10000);
   if (project && ["rm_procurements", "rm_risk_events", "rm_llm_runs", "rm_documents", "rm_document_findings", "rm_external_checks", "rm_change_reports"].includes(spec.table)) query = query.eq("project_id", project);
   if (project && spec.table === "rm_projects") query = query.eq("id", project);
+  if (assessment && ["rm_assessment_matches", "rm_assessment_items"].includes(spec.table)) query = query.eq("assessment_id", assessment);
+  if (assessment && spec.table === "rm_assessments") query = query.eq("id", assessment);
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

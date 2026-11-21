@@ -1,5 +1,8 @@
 import {
-  FileDownIcon,
+  CalculatorIcon,
+  ClipboardCheckIcon,
+  DatabaseIcon,
+  FileStackIcon,
   FolderKanbanIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
@@ -20,13 +23,19 @@ export const mfaEnabled = false;
 
 export type NavItem = { title: string; href: string; icon: LucideIcon };
 
-/** Nawigacja główna: sidebar na desktopie i dolny pasek na telefonie (maks. 5 pozycji). */
+/** Dolny pasek na telefonie mieści najwyżej 5 pozycji — kolejne są tylko w pasku bocznym na desktopie. */
+export const MOBILE_NAV_LIMIT = 5;
+
+/** Nawigacja główna: sidebar na desktopie (wszystkie pozycje) i dolny pasek na telefonie (pierwsze 5). */
 export const navItems: NavItem[] = [
   { title: "Pulpit", href: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "Nowa inwestycja", href: "/assessments/new", icon: ClipboardCheckIcon },
+  { title: "Zapisane oceny", href: "/assessments", icon: FileStackIcon },
   { title: "Projekty", href: "/projects", icon: FolderKanbanIcon },
   { title: "Weryfikacja", href: "/review", icon: ListChecksIcon },
   { title: "Modele", href: "/llm", icon: ScaleIcon },
-  { title: "Eksport", href: "/export", icon: FileDownIcon },
+  { title: "Baza porównawcza", href: "/reference", icon: DatabaseIcon },
+  { title: "Obliczenia", href: "/methodology", icon: CalculatorIcon },
 ];
 
 /** Ścieżki dostępne bez hasła witryny. */

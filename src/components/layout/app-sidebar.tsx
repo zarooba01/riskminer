@@ -40,8 +40,11 @@ export function initials(name: string) {
     .join("");
 }
 
+/** Aktywna pozycja = najdłuższy pasujący adres (np. /assessments/new nie podświetla też /assessments). */
 export function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const matches = (h: string) => pathname === h || pathname.startsWith(`${h}/`);
+  if (!matches(href)) return false;
+  return !navItems.some((item) => item.href !== href && item.href.length > href.length && matches(item.href));
 }
 
 /** Sidebar na desktopie (na bazie bloku shadcn sidebar-07). Pozycje bierze z `navItems`. */

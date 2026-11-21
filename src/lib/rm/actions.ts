@@ -5,6 +5,9 @@ import path from "node:path";
 
 import { revalidatePath } from "next/cache";
 
+import type { ParamInput } from "@/lib/assess/params";
+import { buildReferenceBase } from "@/lib/assess/reference";
+import { runAssessment } from "@/lib/assess/run";
 import { requireUser } from "@/lib/auth/session";
 import { withChangeReport } from "@/lib/rm/change-report";
 import { assignProcurement, buildProjectRecords, dropUnconfirmedEvents, enrichProject } from "@/lib/ingest/enrich";
@@ -407,6 +410,110 @@ export async function decideFinding(id: string, decision: Decision, comment?: st
     await logDecision("document_finding", id, decision, before, after, comment);
     revalidatePath("/", "layout");
     return { ok: true, message: decision === "accept" ? "Ustalenie zatwierdzone." : decision === "reject" ? "Ustalenie odrzucone." : "Przywrócono do weryfikacji." };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/* ───────────── Ocena nowej inwestycji ───────────── */
+
+/** Przeliczenie oceny na aktualnej bazie (nowe projekty, decyzje eksperta) — bez AI, koszt 0. */
+export async function rerunAssessment(id: string): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const r = await runAssessment(id);
+    revalidatePath(`/assessments/${id}`);
+    revalidatePath("/assessments");
+    return { ok: true, message: `Zaktualizowano ocenę: ${r.considered} przypadków, w statystyce ${r.included}. Decyzje eksperta zachowane.` };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Zmiana założeń oceny (parametry, wagi cech, liczba przypadków) i przeliczenie. */
+export async function updateAssessmentParams(id: string, input: ParamInput): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const r = await runAssessment(id, input);
+    await logDecision("assessment", id, "edit_params", null, input);
+    revalidatePath(`/assessments/${id}`);
+    revalidatePath("/assessments");
+    return { ok: true, message: `Zapisano założenia i przeliczono: ${r.considered} przypadków, w statystyce ${r.included}.` };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Decyzja eksperta o pozycji oceny (ryzyko, zalecenie, flaga). Przetrwa aktualizację oceny (stały klucz pozycji). */
+export async function decideAssessmentItem(id: string, decision: Decision, comment?: string): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const supabase = db();
+    const { data: before } = await supabase.from("rm_assessment_items").select("*").eq("id", id).maybeSingle();
+    if (!before) return gone("Ta pozycja");
+    const { data: after, error } = await supabase
+      .from("rm_assessment_items")
+      .update({ status: statusFor[decision], updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    await logDecision("assessment_item", id, decision, before, after, comment);
+    revalidatePath(`/assessments/${before.assessment_id}`);
+    return { ok: true, message: decision === "accept" ? "Zatwierdzono." : decision === "reject" ? "Odrzucono." : "Przywrócono do weryfikacji." };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+export async function deleteAssessment(id: string): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const supabase = db();
+    const { data } = await supabase.from("rm_assessments").select("title,document_source_ids").eq("id", id).maybeSingle();
+    if (!data) return gone("Ta ocena");
+    await supabase.from("rm_assessments").delete().eq("id", id);
+    if (data.document_source_ids?.length) {
+      // Oryginały dokumentów planu w prywatnym Storage też usuwamy (nie należą do żadnego projektu z bazy).
+      const { data: docs } = await supabase.from("rm_sources").select("raw").in("id", data.document_source_ids);
+      const paths = (docs ?? []).map((d) => (d.raw as { storage_path?: string } | null)?.storage_path).filter((x): x is string => Boolean(x));
+      if (paths.length) await supabase.storage.from("rm-documents").remove(paths);
+      await supabase.from("rm_sources").delete().in("id", data.document_source_ids);
+    }
+    await logDecision("assessment", id, "delete", { title: data.title }, null);
+    revalidatePath("/assessments");
+    return { ok: true, message: `Usunięto ocenę „${data.title}”.` };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** Edycja wiedzy eksperckiej kategorii: co sprawdzić, działania, zapisy umowne (zasila oceny nowych inwestycji). */
+export async function editCatalogGuidance(code: string, patch: { checks: string[]; actions: string[]; clauses: string[] }): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const clean = (list: string[]) => list.map((s) => s.trim()).filter(Boolean);
+    const supabase = db();
+    const { data: before } = await supabase.from("rm_risk_catalog").select("code,checks,actions,clauses").eq("code", code).maybeSingle();
+    if (!before) return gone("Ta kategoria");
+    const after = { checks: clean(patch.checks), actions: clean(patch.actions), clauses: clean(patch.clauses) };
+    const { error } = await supabase.from("rm_risk_catalog").update({ ...after, updated_at: new Date().toISOString() }).eq("code", code);
+    if (error) throw new Error(error.message);
+    await logDecision("catalog", code, "edit_guidance", before, after);
+    revalidatePath("/", "layout");
+    return { ok: true, message: `Zapisano wiedzę ekspercką ${code}. Zadziała przy następnej aktualizacji ocen.` };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** (Od)budowa bazy porównawczej do ocen — kopia zakończonych projektów z automatycznie zaakceptowanymi danymi. */
+export async function rebuildReferenceBase(): Promise<ActionResult> {
+  await requireUser();
+  try {
+    const r = await buildReferenceBase();
+    revalidatePath("/reference");
+    return { ok: true, message: `Baza porównawcza: ${r.cases} projektów, ${r.events} zaakceptowanych zdarzeń. Oryginały bez zmian. Zaktualizuj oceny, żeby użyć nowej bazy.` };
   } catch (error) {
     return fail(error);
   }

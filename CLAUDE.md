@@ -19,7 +19,8 @@ Opis projektu, architektura, konfiguracja i polecenia: `README.md`.
   Po włączeniu kont — polityki na `auth.uid()`.
 - Model LLM tylko przez `runTask()` (`src/lib/llm/run.ts`): zapis przebiegu, koszt, cache. Model z env, nie z kodu.
 - Każdy wniosek/rekord ma źródło (`rm_sources`) i — jeśli pochodzi z AI lub reguły — status do decyzji eksperta.
-- Układ mobile-first: sprawdzaj na szerokości 390 px; nawigacja ma najwyżej 5 pozycji (`navItems`).
+- Układ mobile-first: sprawdzaj na szerokości 390 px. Dolny pasek na telefonie pokazuje pierwsze 5 pozycji `navItems`
+  (`MOBILE_NAV_LIMIT`); dalsze pozycje są tylko w pasku bocznym na desktopie — najważniejsze umieszczaj na początku listy.
 - `design-systems/*` to odseparowane piaskownice innych design systemów (opis: `design-systems/README.md`).
   Kod w `src/` nigdy z nich nie importuje; one mogą importować tylko `src/lib/sample-data.ts`.
 - Przed zakończeniem pracy: `npm run lint && npm run typecheck && npm run build && npm run test:e2e`.

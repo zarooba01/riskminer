@@ -39,10 +39,10 @@ export function classifySubsectors(text: string): { main: string | null; extra: 
     const i = t.search(re);
     if (i >= 0) hits.push(`${String(i).padStart(5, "0")}|${name}`);
   };
-  add("Kanalizacja sanitarna", /kanalizac\w* sanitarn|rurociąg\w* tłoczn|tranzyt\w* przesył|kanalizac\w* ściek/);
+  add("Kanalizacja sanitarna", /kanalizac[\wąćęłńóśźż]* sanitarn|rurociąg[\wąćęłńóśźż]* tłoczn|tranzyt[\wąćęłńóśźż]* przesył|kanalizac[\wąćęłńóśźż]* ściek/);
   add("Sieć wodociągowa", /sieci? wodociąg|wodociąg/);
   add("Oczyszczalnia ścieków", /oczyszczal/);
-  add("Uzdatnianie i zaopatrzenie w wodę", /uzdatniania wody|stacj\w* uzdatn|\bsuw\b|ujęci/);
+  add("Uzdatnianie i zaopatrzenie w wodę", /uzdatniania wody|stacj[\wąćęłńóśźż]* uzdatn|\bsuw\b|ujęci/);
   add("Kanalizacja deszczowa i retencja", /deszczow|retenc/);
   const ordered = hits.sort().map((h) => h.split("|")[1]);
   const worksType = /przebudow|modernizac|renowac|remont|wymian/.test(t)

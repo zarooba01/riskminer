@@ -235,6 +235,6 @@ export async function getSource(id: string): Promise<SourceDetail | null> {
   if (!data) return null;
   const { raw, ...source } = data as SourceDetail & { raw: { storage_path?: string } | null };
   // Dokument eksperta: link do oryginału jest tymczasowy (podpisany), generujemy go przy każdym wyświetleniu.
-  if (source.kind === "upload") source.url = await signedDocumentUrl(raw?.storage_path ?? null);
+  if (source.kind === "upload" || source.kind === "assessment") source.url = await signedDocumentUrl(raw?.storage_path ?? null);
   return source;
 }

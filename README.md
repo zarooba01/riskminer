@@ -27,7 +27,8 @@ Każdy rekord i każdy wniosek prowadzi do źródła, a każda propozycja (dopas
 | Porównanie modeli: koszt, czas, poprawność schematu, cytaty, precyzja i czułość względem decyzji eksperta | działa |
 | Eksport CSV/JSON każdej encji | działa |
 | Hasło witryny (`SITE_PASSWORD`) | działa |
-| Analiza nowej inwestycji (podobne projekty, przedziały odchyleń, flagi, zapisy umowne) | następny krok |
+| **Ocena nowej inwestycji**: opis językiem naturalnym lub dokument PDF/DOCX → podobne zakończone inwestycje z wyjaśnieniem podobieństwa, przedziały odchyleń kosztu i terminu z liczebnością próby i niepewnością, prognoza dla budżetu i terminu, czerwone flagi, ryzyka z cytatami ze źródeł, co sprawdzić przed przetargiem, działania i zapisy umowne (jedna zakładka „Ryzyka i zalecenia”); zapis jako rekordy, filtrowanie, aktualizacja, eksport JSON/CSV | działa (bez AI; opcjonalny krok AI) |
+| Wiedza ekspercka do ocen (co sprawdzić / działania / zapisy umowne dla R01–R15) edytowana w katalogu | działa |
 | KIO, NIK, monitoring trwających inwestycji (cron), odczyt platform-aplikacji JS (Marketplanet, Logintrade) | zaprojektowane |
 
 ## Architektura
@@ -62,6 +63,25 @@ BZP API (kopia bzp.cytr.us / ezamowienia.gov.pl)
 6. **Zmiany umowy**: ogłoszenie o wykonaniu podaje ponumerowaną listę zmian, a każda mogła mieć wcześniej osobne ogłoszenie o zmianie (bez numeru). Łączymy je po kwocie (do 5% różnicy przy tej samej przyczynie) albo po przyczynie i opisie; głównym źródłem jest ogłoszenie o zmianie (data, pełny opis), pozostałe trafiają do `related_source_ids`.
 7. **Źródła dodatkowe** (`src/lib/ingest/external.ts`, tabela `rm_external_checks`): adres strony postępowania z pkt 3.1 ogłoszenia o zamówieniu → lista dokumentów, odczyt PDF (informacja o kwocie, z otwarcia ofert, o wyborze oferty), sprawdzenie numeru BZP, tytułu i wartości umowy; TED — wyszukiwanie po nazwie zamawiającego i podobieństwie tytułu (próg 70%). Wynik „nie znaleziono” też jest zapisywany z podstawą (np. zamówienie poniżej progów UE). Potwierdzenie na stronie zamawiającego dopisujemy do podstawy niepewnego dopasowania.
 
+## Ocena nowej inwestycji (`/assessments/new`, zapisane oceny: `/assessments`, opis metody: `/methodology`)
+
+Urzędnik opisuje plan zwykłym językiem („Chcemy wybudować kanalizację sanitarną w Góraszce, woj. mazowieckie, ok. 3 km, 4 mln zł, 12 miesięcy; znane warunki: kolizje z uzbrojeniem”) i/lub wgrywa do 5 dokumentów PDF/DOCX. Formularz nie ma osobnych pól — parametry odczytujemy z tekstu, a w wyniku można je poprawić (zakładka „Założenia”). Pole „Użyj modelu AI do analizy” (domyślnie wyłączone) przełącza ocenę w tryb AI — wtedy analizy deterministycznej nie ma (pkt 6). Wynik to rekordy w bazie: `rm_assessments`, `rm_assessment_matches` i `rm_assessment_items` (migracja `0008_assessments.sql`).
+
+1. **Parametry** (`src/lib/assess/params.ts`). Pola wpisane przez użytkownika mają pierwszeństwo. Brakujące odczytujemy regułami z opisu i dokumentu: podsektor i rodzaj robót według słownika eksperckiego, długość (km/m/mb/L=), budżet (zł/tys./mln), czas (miesiące, lata, „do końca 2027”), województwo. Każde pole ma pochodzenie: wpisane, odczytane z opisu lub zaproponowane przez model AI.
+2. **Podobne przypadki** (`similarity.ts`, `cases.ts`). Korpus to **baza porównawcza** (`/reference`, tabele `rm_ref_cases` i `rm_ref_events`, migracja `0009_reference_base.sql`): sklonowane zakończone projekty z dopasowaniem do BZP, danymi o wykonaniu umowy i zaakceptowanymi zdarzeniami. Akceptacja w kopii jest automatyczna (oznaczenie „Automatyczna akceptacja (dane demo)”), a oryginały w Projektach i Weryfikacji zostają bez zmian, do decyzji eksperta. Budowa (`src/lib/assess/reference.ts`, `POST /api/reference/build`, przycisk „Odbuduj z bazy roboczej”): projektom z samą propozycją dopasowania tymczasowo zatwierdzamy najlepszą propozycję, odtwarzamy umowę i zdarzenia z zapisanych ogłoszeń, kopiujemy, a potem przywracamy oryginał. Projekt bez zdarzeń ryzyka nie wchodzi do bazy. Wynik 0–100 jest ważoną sumą cech: podsektor 35, rodzaj robót 15, zakres 25 (cosinus TF-IDF opisu planu względem tytułu, adnotacji i opisu przedmiotu zamówienia z ogłoszenia BZP; pokazujemy wspólne pojęcia), skala 15 (budżet vs wartość umowy, długość vs długość, w skali logarytmicznej), województwo 10. Cechy, których plan nie podaje, nie wpływają na wynik. Wagi i wielkość próby (3–15) użytkownik zmienia w zakładce „Założenia”. Do statystyki wchodzi top-k przypadków z zatwierdzonym dopasowaniem do BZP i danymi o wykonaniu umowy. Przypadki pominięte są widoczne z powodem.
+3. **Statystyka** (`engine.ts`, oznaczenie „Obliczenie”): mediana, P25–P75 i min–maks. dla zmiany kosztu, opóźnienia (dni i % pierwotnego okresu), okresu realizacji, liczby ofert, kosztu 1 km, a także udział umów z aneksem. Każda wartość podaje liczebność (n). Niepewność zależy od n: <5 duża, 5–9 średnia, ≥10 umiarkowana. Prognoza to budżet × (1 + kwartyle odchyleń) i termin × (1 + kwartyle opóźnień). Przy n < 3 nie podajemy przedziałów.
+4. **Ryzyka i zalecenia**: zdarzenia `rm_risk_events` z przypadków w próbie (bez odrzuconych) według kodu katalogu. Pokazujemy, w ilu z N umów wystąpiło dane ryzyko (osobno zatwierdzone i do weryfikacji), skutki, przyczyny ze źródeł i cytaty z linkiem do podglądu źródła. Warunki lokalne z opisu (np. „kolizje”, „włączenie”, „uzgodnienia”) wskazują ryzyka „do lokalnego potwierdzenia”. Do każdego ryzyka dochodzą pozycje z katalogu eksperckiego (`rm_risk_catalog.checks/actions/clauses`, edycja w Weryfikacja → Katalog) oraz działania zaradcze zapisane przy zdarzeniach. Flagi są liczone na próbie. Braki w opisie wynikają z poradnika eksperckiego: miejsce włączenia, prawa do terenu, decyzje, liczba przyłączy, warunki gruntowe.
+5. **Ekspert** zatwierdza lub odrzuca wnioski modelu AI (`rm_decisions`, encja `assessment_item`); pozycje deterministyczne (obliczenia, katalog ekspercki, zdarzenia ze źródeł) nie wymagają osobnej decyzji. „Zaktualizuj ocenę” przelicza wynik na bieżącej bazie — decyzje zostają (stały klucz pozycji), a ekran pokazuje „co się zmieniło” (próba, mediany, przypadki, ryzyka).
+6. **Ocena AI (pole „Użyj modelu AI”; tryb oceny `mode = ai`, migracja `0010_assessment_mode.sql`)** (`src/lib/llm/tasks/assessment-ai.ts`): zamiast analizy deterministycznej jedno wywołanie modelu. Model dostaje opis planu, fragment dokumentów i bazę porównawczą w skrócie (do 3 zdarzeń na przypadek, aliasy E1…En). Odczytuje parametry, wybiera 5–10 podobnych przypadków z powodami i formułuje do 6 ryzyk z rzeczami do sprawdzenia, działaniami i zapisami umownymi oraz kwestie do lokalnego potwierdzenia. Serwer odrzuca przypadki spoza bazy i ryzyka bez odwołania do istniejącego przypadku lub zdarzenia. Mediany, przedziały, n, prognozę i flagi liczymy z danych przypadków wybranych przez model (`summarizeSample` w `engine.ts`). Wnioski modelu czekają na decyzję eksperta. Wywołanie trafia do `rm_llm_runs` (koszt, cache po treści wejścia).
+
+Skalowanie: TF-IDF liczymy w pamięci, co przy setkach przypadków wystarcza. Przy tysiącach wystarczy zamienić cechę „zakres” na embeddingi (pgvector), bez zmiany reszty modelu oceny.
+
+| Metoda | Ścieżka | Działanie |
+|---|---|---|
+| POST | `/api/assessments` | nowa ocena (multipart: `description` i/lub `file` — do 5 plików; `mode=ai` — ocena AI; dla automatyzacji opcjonalnie `subsector_main`, `works_type`, `province`, `length_km`, `budget_pln`, `duration_months`, `local_conditions`) |
+| POST | `/api/assessments/<id>/run` | przeliczenie oceny wg jej trybu (deterministycznie albo modelem AI) |
+| GET | `/api/assessments/<id>/export?format=json\|csv[&part=items\|matches]` | cała ocena (JSON) albo pozycje lub przypadki (CSV) |
+
 ## Model językowy: konfiguracja, koszt, miejsce przetwarzania
 
 | Zmienna | Znaczenie |
@@ -82,7 +102,7 @@ npm install
 cp .env.example .env.local          # uzupełnij Supabase i (lokalnie) AI_GATEWAY_API_KEY
 psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/0002_riskminer.sql
 psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/0003_contract_parts.sql
-# … i kolejne migracje po kolei, do 0007_sources_and_reports.sql
+# … i kolejne migracje po kolei, do 0009_reference_base.sql
 npm run dev                         # http://localhost:3000 → Pulpit → Importuj → Wzbogać wszystkie
 ```
 
@@ -93,7 +113,7 @@ API do automatyzacji (te same operacje co w interfejsie, powtarzalne):
 | POST | `/api/import` | import zestawu organizatora (lub pliku `file`, multipart) |
 | POST | `/api/projects/<id>/enrich` | wzbogacenie z BZP |
 | POST | `/api/projects/<id>/analyze?model=…` | analiza ryzyk modelem |
-| GET | `/api/export/<encja>?format=csv\|json[&project=…]` | eksport: projects, procurements, notices, contracts, changes, events, catalog, sources, llm_runs, decisions, documents, findings, external_checks, change_reports |
+| GET | `/api/export/<encja>?format=csv\|json[&project=…][&assessment=…]` | eksport: projects, procurements, notices, contracts, changes, events, catalog, sources, llm_runs, decisions, documents, findings, external_checks, change_reports, assessments, assessment_matches, assessment_items |
 
 ## Deploy na Vercel
 
@@ -113,6 +133,7 @@ Bez kont użytkowników witrynę chroni hasło: `src/proxy.ts` przekierowuje na 
 
 ```
 src/lib/ingest      import XLSX, klient BZP, wzbogacenie i łączenie
+src/lib/assess      ocena nowej inwestycji: parametry, przypadki, podobieństwo, statystyka, ryzyka, zapis
 src/lib/rm          model danych (typy), parser ogłoszeń, reguły, zapytania, server actions, eksport
 src/lib/llm         konfiguracja modeli, cennik, runTask (zapis + cache), porównanie, zadanie risk-events
 src/components/rm   wspólne elementy: pochodzenie danych, źródło, karta zdarzenia

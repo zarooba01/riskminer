@@ -1,4 +1,4 @@
-import { AlertTriangleIcon, BotIcon, CheckCircle2Icon, DatabaseIcon, FileSearchIcon, FolderKanbanIcon } from "lucide-react";
+import { AlertTriangleIcon, BotIcon, CheckCircle2Icon, ClipboardCheckIcon, DatabaseIcon, FileDownIcon, FileSearchIcon, FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/layout/page-header";
@@ -42,9 +42,16 @@ export function DashboardView({ stats, model, configError, ...importProps }: Pro
         title="Risk Miner"
         description="Baza doświadczeń inwestycji wodno-kanalizacyjnych: od rozproszonych ogłoszeń do zweryfikowanych zdarzeń ryzyka."
         actions={
-          <Button variant="outline" asChild>
-            <Link href="/review">Kolejka weryfikacji ({stats?.proposed ?? 0})</Link>
-          </Button>
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/export">
+                <FileDownIcon aria-hidden /> Eksport danych
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/review">Kolejka weryfikacji ({stats?.proposed ?? 0})</Link>
+            </Button>
+          </>
         }
       />
       {configError && (
@@ -60,6 +67,22 @@ export function DashboardView({ stats, model, configError, ...importProps }: Pro
         <StatCard label="Zdarzenia do weryfikacji" value={String(stats?.proposed ?? 0)} icon={DatabaseIcon} hint={`zatwierdzone: ${stats?.accepted ?? 0}`} />
         <StatCard label="Koszt AI łącznie" value={usd(stats?.costUsd ?? 0)} icon={BotIcon} hint={`${stats?.runs ?? 0} wywołań`} />
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ClipboardCheckIcon className="size-4" aria-hidden /> Oceń nową inwestycję
+          </CardTitle>
+          <CardDescription>
+            Opisz plan albo wgraj dokument — Risk Miner dobierze podobne zakończone inwestycje, pokaże odchylenia kosztu i terminu, ryzyka oraz
+            to, co sprawdzić przed przetargiem.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link href="/assessments/new">Nowa ocena inwestycji</Link>
+          </Button>
+        </CardContent>
+      </Card>
       <ImportPanel {...importProps} />
       <Card>
         <CardHeader>

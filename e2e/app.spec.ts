@@ -40,8 +40,12 @@ test("strona startowa prowadzi do pulpitu i nawigacji", async ({ page, isMobile 
     ["Projekty", "Projekty"],
     ["Weryfikacja", "Weryfikacja"],
     ["Modele", "Porównanie modeli"],
-    ["Eksport", "Eksport"],
-  ]) {
+    ["Nowa inwestycja", "Ocena nowej inwestycji"],
+    ["Zapisane oceny", "Zapisane oceny"],
+    ["Baza porównawcza", "Baza porównawcza"],
+    ["Obliczenia", "Obliczenia"],
+  ].filter(([link]) => !(isMobile && ["Modele", "Baza porównawcza", "Obliczenia"].includes(link)))) {
+    // „Modele”, „Baza porównawcza” i „Obliczenia” są za piątą pozycją — na telefonie tylko w pasku bocznym (dolny pasek mieści 5).
     await nav.getByRole("link", { name: link }).click();
     await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
   }
@@ -49,6 +53,36 @@ test("strona startowa prowadzi do pulpitu i nawigacji", async ({ page, isMobile 
 
 test.describe("dane (Supabase)", () => {
   test.skip(!database, "Brak kluczy bazy w .env.local.");
+
+  test("ocena nowej inwestycji: podobne przypadki, ryzyka, eksport i usunięcie", async ({ page, request }) => {
+    test.setTimeout(90_000);
+    const tag = `RM-TEST-e2e-${Date.now()}`;
+    await unlock(page);
+    await page.goto("/assessments/new");
+    await page.getByLabel("Opis planowanej inwestycji").fill(`${tag}: chcemy wybudować kanalizację sanitarną w Góraszce, woj. mazowieckie, ok. 3 km sieci, budżet 4 mln zł, 12 miesięcy. Znane warunki: kolizje z uzbrojeniem.`);
+    await expect(page.getByLabel("Użyj modelu AI do analizy")).not.toBeChecked();
+    await page.getByRole("button", { name: "Oceń inwestycję" }).click();
+    await expect(page).toHaveURL(/\/assessments\/[0-9a-f-]{36}$/, { timeout: 60_000 });
+    await expect(page.getByRole("heading", { name: new RegExp(tag), level: 1 })).toBeVisible();
+    await expect(page.getByText("Próba porównawcza")).toBeVisible();
+
+    await page.getByRole("tab", { name: /Podobne inwestycje/ }).click();
+    await expect(page.getByText("Dlaczego podobne:").first()).toBeVisible();
+    await page.getByRole("tab", { name: /Ryzyka/ }).click();
+    await expect(page.getByText("Sprawdź przed przetargiem").first()).toBeVisible();
+
+    const id = page.url().split("/").pop()!;
+    const json = await request.get(`/api/assessments/${id}/export?format=json`);
+    expect(json.status()).toBe(200);
+    const body = await json.json();
+    expect(body.matches.length).toBeGreaterThan(0);
+    expect((await request.get(`/api/assessments/${id}/export?format=csv&part=items`)).status()).toBe(200);
+    expect((await request.get(`/api/export/assessment_items?format=json&assessment=${id}`)).status()).toBe(200);
+
+    await page.goto("/assessments");
+    await page.getByRole("button", { name: new RegExp(`Usuń ocenę ${tag}`) }).click();
+    await expect(page.getByRole("link", { name: new RegExp(tag) })).toHaveCount(0);
+  });
 
   test("projekt pokazuje KPI, ryzyka i źródło w szczegółach", async ({ page }) => {
     await unlock(page);

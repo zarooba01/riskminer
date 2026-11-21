@@ -14,6 +14,9 @@ export const exportEntities = {
   findings: { table: "rm_document_findings", label: "Ustalenia z dokumentów (potwierdza / uzupełnia / rozbieżności)", select: "*" },
   external_checks: { table: "rm_external_checks", label: "Źródła dodatkowe (strona postępowania, TED): wynik i podstawa", select: "*" },
   change_reports: { table: "rm_change_reports", label: "Raporty zmian po ponownej analizie", select: "*" },
+  assessments: { table: "rm_assessments", label: "Oceny nowych inwestycji (założenia, statystyka)", select: "*" },
+  assessment_matches: { table: "rm_assessment_matches", label: "Oceny: podobne inwestycje i podstawa podobieństwa", select: "*" },
+  assessment_items: { table: "rm_assessment_items", label: "Oceny: ryzyka, flagi, zalecenia, zapisy umowne", select: "*" },
 } as const;
 
 export type ExportEntity = keyof typeof exportEntities;

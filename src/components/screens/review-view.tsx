@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { ActionButton } from "@/components/rm/action-button";
+import { CatalogGuidanceDialog, type GuidancePatch } from "@/components/rm/catalog-guidance-dialog";
 import type { MatchActions, MatchDialogProject } from "@/components/rm/match-dialog";
 import { MatchRow } from "@/components/rm/match-row";
 import { Provenance } from "@/components/rm/provenance";
@@ -25,6 +26,7 @@ type Props = {
   decideProcurement?: (id: string, decision: "accept" | "reject" | "reopen") => Promise<ActionResult>;
   assignProcurement?: MatchActions["assign"];
   decideCatalog?: (code: string, approved: boolean) => Promise<ActionResult>;
+  editGuidance?: (code: string, patch: GuidancePatch) => Promise<ActionResult>;
 };
 
 const actionLabel: Record<string, string> = {
@@ -34,6 +36,9 @@ const actionLabel: Record<string, string> = {
   edit: "poprawił i zatwierdził",
   exemplary: "oznaczył jako wzorcowe",
   not_exemplary: "usunął oznaczenie wzorcowe",
+  edit_guidance: "zmienił zalecenia kategorii",
+  edit_params: "zmienił założenia oceny",
+  delete: "usunął",
 };
 
 function NothingHere({ text }: { text: string }) {
@@ -48,7 +53,7 @@ function NothingHere({ text }: { text: string }) {
 }
 
 /** Panel eksperta: każda propozycja (dopasowanie, zdarzenie, kategoria) wymaga decyzji; wszystko trafia do historii. */
-export function ReviewView({ data, eventActions, decideProcurement, assignProcurement, decideCatalog }: Props) {
+export function ReviewView({ data, eventActions, decideProcurement, assignProcurement, decideCatalog, editGuidance }: Props) {
   const approvedCatalog = data.catalog.filter((c) => c.approved);
   const proposedCatalog = data.catalog.filter((c) => !c.approved);
 
@@ -101,7 +106,7 @@ export function ReviewView({ data, eventActions, decideProcurement, assignProcur
 
         <TabsContent value="catalog" className="flex flex-col gap-4">
           <p className="text-sm text-muted-foreground">
-            Katalog jest otwarty: model może zaproponować nową kategorię, ekspert ją zatwierdza. Słowa kluczowe kategorii zasilają reguły — bez zmian w kodzie.
+            Katalog jest otwarty: model może zaproponować nową kategorię, ekspert ją zatwierdza. Słowa kluczowe kategorii zasilają reguły, a zalecenia (co sprawdzić, działania, zapisy umowne) — ocenę nowych inwestycji. Bez zmian w kodzie.
           </p>
           <Card className="py-0">
             <Table>
@@ -124,7 +129,8 @@ export function ReviewView({ data, eventActions, decideProcurement, assignProcur
                     <TableCell>
                       <Provenance kind={c.proposed_by === "llm" ? "llm" : "expert"} />
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right whitespace-nowrap">
+                      {editGuidance && <CatalogGuidanceDialog entry={c} save={editGuidance} />}
                       {decideCatalog &&
                         (c.approved ? (
                           <ActionButton size="sm" variant="ghost" action={decideCatalog.bind(null, c.code, false)}>
