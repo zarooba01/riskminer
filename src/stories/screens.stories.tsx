@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { AppShell } from "@/components/layout/app-shell";
 import { AssessmentDetailView } from "@/components/screens/assessment-detail-view";
 import { AssessmentsView } from "@/components/screens/assessments-view";
-import { MethodologyView } from "@/components/screens/methodology-view";
 import { NewAssessmentView } from "@/components/screens/new-assessment-view";
 import { ReferenceBaseView } from "@/components/screens/reference-base-view";
 import { DashboardView } from "@/components/screens/dashboard-view";
@@ -39,14 +38,33 @@ type Story = StoryObj<typeof meta>;
 
 const eventActions = { decide: fakeResult(), edit: fakeResult(), exemplary: fakeResult() };
 
+/** 31 dni kolejki (zapas na „Ten miesiąc”): historia od 10. dnia, potem napływ i decyzje eksperta (dni bez aktywności = 0). */
+const sampleFlow = {
+  historyFrom: "2026-11-02",
+  days: Array.from({ length: 31 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 9, 23 + i));
+    const date = d.toISOString().slice(0, 10);
+    const known = date >= "2026-11-02";
+    return { date, created: known ? [12, 0, 3, 7, 0, 0, 5, 9, 2][i % 9] : null, resolved: known ? [0, 4, 6, 2, 0, 1, 8, 3, 0][i % 9] : null };
+  }),
+};
+
 export const Pulpit: Story = {
   render: () => (
     <DashboardView
-      stats={{ projects: 22, enriched: 18, notices: 61, contracts: 15, proposed: 43, accepted: 12, runs: 9, costUsd: 0.0731 }}
+      stats={{ projects: 22, enriched: 18, proposed: 43, accepted: 12, runs: 9, costUsd: 0.0731, matchProjects: 5 }}
+      flow={sampleFlow}
       model="anthropic/claude-haiku-5.5"
-      projectIds={sampleProjects.map((p) => p.id)}
-      importAction={fakeResult("Zaimportowano 22 projekty.")}
-      enrichAction={fakeResult("RM-2026-001: ogłoszeń 3, zdarzeń 4.")}
+    />
+  ),
+};
+export const PulpitBezHistorii: Story = {
+  name: "Pulpit (brak historii)",
+  render: () => (
+    <DashboardView
+      stats={{ projects: 0, enriched: 0, proposed: 0, accepted: 0, runs: 0, costUsd: 0, matchProjects: 0 }}
+      flow={{ days: [], historyFrom: null }}
+      model="anthropic/claude-haiku-5.5"
     />
   ),
 };
@@ -102,19 +120,12 @@ export const Modele: Story = {
   parameters: path("/llm"),
   render: () => (
     <LlmView
-      projects={sampleProjects.map((p) => ({ id: p.id, title: p.title }))}
-      selectedProject="RM-2026-001"
-      models={[
-        { id: "anthropic/claude-haiku-5.5", region: "USA (Anthropic)", price: "$0.10 / $0.50 za 1M tok." },
-        { id: "mistral/ministral-14b", region: "UE (Mistral, Francja)", price: "$0.20 / $0.20 za 1M tok." },
-      ]}
-      metrics={[
-        { model: "anthropic/claude-haiku-5.5", region: "USA (Anthropic)", createdAt: "2026-11-21", validSchema: true, error: null, latencyMs: 4200, tokensIn: 6100, tokensOut: 900, costUsd: 0.00106, costSource: "gateway", events: 4, codes: ["R02", "R06", "R07"], quotesVerified: 1, precision: 0.67, recall: 1, output: { events: [{ risk_code: "R02", title: "Nieprzewidziane wyburzenie murów", quote: "wyburzeniu murów ceglano -betonowych" }] } },
-        { model: "mistral/ministral-14b", region: "UE (Mistral, Francja)", createdAt: "2026-11-21", validSchema: true, error: null, latencyMs: 3100, tokensIn: 6300, tokensOut: 1100, costUsd: 0.00148, costSource: "pricing", events: 3, codes: ["R06", "R07"], quotesVerified: 0.67, precision: 1, recall: 1, output: null },
-      ]}
-      goldCodes={["R06", "R07"]}
       productionModel="anthropic/claude-haiku-5.5"
-      compare={fakeResult()}
+      models={[
+        { id: "anthropic/claude-haiku-5.5", region: "USA (Anthropic)", price: "$0.10 / $0.50", production: true, calls: 31, tokensIn: 189_400, tokensOut: 27_900, costUsd: 0.0329, lastUsedAt: "2026-11-21T16:42:00Z" },
+        { id: "mistral/ministral-14b", region: "UE (Mistral, Francja)", price: "$0.20 / $0.20", production: false, calls: 4, tokensIn: 25_200, tokensOut: 4_400, costUsd: 0.0059, lastUsedAt: "2026-11-20T10:05:00Z" },
+        { id: "alibaba/qwen3.7-flash", region: "poza UE (Alibaba)", price: "cena nieznana", production: false, calls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, lastUsedAt: null },
+      ]}
     />
   ),
 };
@@ -154,11 +165,6 @@ export const OcenaInwestycji: Story = {
 };
 export const OcenaInwestycjiTelefon: Story = { ...OcenaInwestycji, ...phone, name: "Ocena inwestycji (telefon)" };
 
-export const Obliczenia: Story = {
-  parameters: path("/methodology"),
-  render: () => <MethodologyView corpus={23} />,
-};
-export const ObliczeniaTelefon: Story = { ...Obliczenia, ...phone, name: "Obliczenia (telefon)" };
 
 export const BazaPorownawcza: Story = {
   name: "Baza porównawcza",

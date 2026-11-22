@@ -1,18 +1,9 @@
 "use client";
 
-import { ChevronsUpDownIcon, ListChecksIcon, LogOutIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -48,7 +39,7 @@ export function isActive(pathname: string, href: string) {
 }
 
 /** Sidebar na desktopie (na bazie bloku shadcn sidebar-07). Pozycje bierze z `navItems`. */
-export function AppSidebar({ user, onSignOut }: { user: ShellUser; onSignOut?: () => void }) {
+export function AppSidebar({ user }: { user: ShellUser; onSignOut?: () => void }) {
   const pathname = usePathname();
 
   return (
@@ -86,36 +77,16 @@ export function AppSidebar({ user, onSignOut }: { user: ShellUser; onSignOut?: (
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{user.email}</span>
-                  </div>
-                  <ChevronsUpDownIcon className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="right" align="end" sideOffset={4} className="min-w-52">
-                <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
-                  {user.email}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/review">
-                    <ListChecksIcon /> Kolejka weryfikacji
-                  </Link>
-                </DropdownMenuItem>
-                {onSignOut && (
-                  <DropdownMenuItem onClick={() => onSignOut()}>
-                    <LogOutIcon /> Wyloguj się
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Tylko informacja, kto pracuje w aplikacji — bez menu (konta są wyłączone, dostęp chroni hasło witryny). */}
+            <div className="flex items-center gap-2 p-2 group-data-[collapsible=icon]:p-0">
+              <Avatar className="size-8 rounded-lg">
+                <AvatarFallback className="rounded-lg">{initials(user.name)}</AvatarFallback>
+              </Avatar>
+              <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              </div>
+            </div>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

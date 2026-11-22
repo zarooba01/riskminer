@@ -39,13 +39,12 @@ test("strona startowa prowadzi do pulpitu i nawigacji", async ({ page, isMobile 
   for (const [link, heading] of [
     ["Projekty", "Projekty"],
     ["Weryfikacja", "Weryfikacja"],
-    ["Modele", "Porównanie modeli"],
+    ["Modele", "Modele"],
     ["Nowa inwestycja", "Ocena nowej inwestycji"],
     ["Zapisane oceny", "Zapisane oceny"],
     ["Baza porównawcza", "Baza porównawcza"],
-    ["Obliczenia", "Obliczenia"],
-  ].filter(([link]) => !(isMobile && ["Modele", "Baza porównawcza", "Obliczenia"].includes(link)))) {
-    // „Modele”, „Baza porównawcza” i „Obliczenia” są za piątą pozycją — na telefonie tylko w pasku bocznym (dolny pasek mieści 5).
+  ].filter(([link]) => !(isMobile && ["Modele", "Baza porównawcza"].includes(link)))) {
+    // „Modele” i „Baza porównawcza” są za piątą pozycją — na telefonie tylko w pasku bocznym (dolny pasek mieści 5).
     await nav.getByRole("link", { name: link }).click();
     await expect(page.getByRole("heading", { name: heading, level: 1 })).toBeVisible();
   }

@@ -12,10 +12,15 @@ import { days, pln, type ActionResult } from "@/lib/rm/format";
 import type { CatalogEntry, RiskEvent, Source } from "@/lib/rm/types";
 import { cn } from "@/lib/utils";
 
-import type { RiskEventActions } from "./risk-event-card";
-import { RiskEventEditDialog } from "./risk-event-edit-dialog";
+import { RiskEventEditDialog, type RiskEventPatch } from "./risk-event-edit-dialog";
 import { MissingData } from "./missing-data";
 import { SourceLink } from "./source-link";
+
+export type RiskEventActions = {
+  decide: (id: string, decision: "accept" | "reject" | "reopen", comment?: string) => Promise<ActionResult>;
+  edit: (id: string, patch: RiskEventPatch, comment?: string) => Promise<ActionResult>;
+  exemplary: (id: string, value: boolean) => Promise<ActionResult>;
+};
 
 const statusDot: Record<RiskEvent["status"], { className: string; label: string }> = {
   proposed: { className: "bg-warning", label: "do weryfikacji" },

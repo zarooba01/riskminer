@@ -1,8 +1,7 @@
 "use client";
 
-import { SparklesIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,10 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { ProgressSteps, type ProgressStep } from "./progress-steps";
 
 /** Przykład z opisu wyzwania (demo dla jury) — wszystko w jednym opisie, parametry odczytamy z tekstu. */
-export const demoExample =
-  "Chcemy wybudować kanalizację sanitarną w Góraszce (gmina Wiązowna, województwo mazowieckie). Około 3 km sieci grawitacyjno-tłocznej z przepompownią i przyłączami, budżet 4 mln zł, czas realizacji 12 miesięcy. " +
-  "Znane warunki: włączenie do istniejącej sieci kanalizacyjnej w sąsiedniej miejscowości, uzgodnienia z zarządcą drogi powiatowej, możliwe kolizje z uzbrojeniem (gaz, telekomunikacja).";
-
 type Phase = "form" | "running" | "error";
 
 type Props = {
@@ -51,7 +46,6 @@ async function post(url: string, body?: FormData) {
 /** Formularz nowej oceny: opis językiem naturalnym i/lub dokumenty; opcjonalnie analiza modelem AI. */
 export function AssessmentForm({ model, region }: Props) {
   const router = useRouter();
-  const textRef = useRef<HTMLTextAreaElement>(null);
   const [phase, setPhase] = useState<Phase>("form");
   const [steps, setSteps] = useState<ProgressStep[]>(initialSteps(0, false));
   const [error, setError] = useState<string | null>(null);
@@ -116,21 +110,8 @@ export function AssessmentForm({ model, region }: Props) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <Field>
-        <div className="flex items-center justify-between gap-2">
-          <FieldLabel htmlFor="description">Opis planowanej inwestycji</FieldLabel>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (textRef.current) textRef.current.value = demoExample;
-            }}
-          >
-            <SparklesIcon aria-hidden /> Wstaw przykład (Góraszka)
-          </Button>
-        </div>
+        <FieldLabel htmlFor="description">Opis planowanej inwestycji</FieldLabel>
         <Textarea
-          ref={textRef}
           id="description"
           name="description"
           rows={6}

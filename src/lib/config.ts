@@ -1,5 +1,4 @@
 import {
-  CalculatorIcon,
   ClipboardCheckIcon,
   DatabaseIcon,
   FileStackIcon,
@@ -35,7 +34,6 @@ export const navItems: NavItem[] = [
   { title: "Weryfikacja", href: "/review", icon: ListChecksIcon },
   { title: "Modele", href: "/llm", icon: ScaleIcon },
   { title: "Baza porównawcza", href: "/reference", icon: DatabaseIcon },
-  { title: "Obliczenia", href: "/methodology", icon: CalculatorIcon },
 ];
 
 /** Ścieżki dostępne bez hasła witryny. */

@@ -1,10 +1,12 @@
+import Link from "next/link";
+
 import { PageHeader } from "@/components/layout/page-header";
 import { ActionButton } from "@/components/rm/action-button";
 import { CatalogGuidanceDialog, type GuidancePatch } from "@/components/rm/catalog-guidance-dialog";
 import type { MatchActions, MatchDialogProject } from "@/components/rm/match-dialog";
 import { MatchRow } from "@/components/rm/match-row";
 import { Provenance } from "@/components/rm/provenance";
-import { RiskEventCard, type RiskEventActions } from "@/components/rm/risk-event-card";
+import { RiskEventRow, type RiskEventActions } from "@/components/rm/risk-event-row";
 import { Card } from "@/components/ui/card";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,6 +24,8 @@ export type ReviewData = {
 
 type Props = {
   data: ReviewData;
+  /** Zakładka otwierana na starcie (np. skrót z Pulpitu: /review?tab=matches). */
+  initialTab?: "events" | "matches" | "catalog" | "history";
   eventActions?: RiskEventActions;
   decideProcurement?: (id: string, decision: "accept" | "reject" | "reopen") => Promise<ActionResult>;
   assignProcurement?: MatchActions["assign"];
@@ -53,41 +57,29 @@ function NothingHere({ text }: { text: string }) {
 }
 
 /** Panel eksperta: każda propozycja (dopasowanie, zdarzenie, kategoria) wymaga decyzji; wszystko trafia do historii. */
-export function ReviewView({ data, eventActions, decideProcurement, assignProcurement, decideCatalog, editGuidance }: Props) {
+export function ReviewView({ data, initialTab = "matches", eventActions, decideProcurement, assignProcurement, decideCatalog, editGuidance }: Props) {
   const approvedCatalog = data.catalog.filter((c) => c.approved);
   const proposedCatalog = data.catalog.filter((c) => !c.approved);
+  // Jak w Projekty → Ryzyka: zwarte wiersze, pogrupowane po projekcie; kolejność z kolejki (najmniej pewne najpierw).
+  const eventsByProject: { projectId: string; title: string; events: ReviewData["events"] }[] = [];
+  for (const e of data.events) {
+    let group = eventsByProject.find((g) => g.projectId === e.project_id);
+    if (!group) eventsByProject.push((group = { projectId: e.project_id, title: e.project_title, events: [] }));
+    group.events.push(e);
+  }
 
   return (
     <>
       <PageHeader title="Weryfikacja" description="Niepewne propozycje są na górze (sortowanie po pewności). Zatwierdzone przykłady wzorcowe trafiają do kolejnych analiz modelu." />
-      <Tabs defaultValue="events">
+      <Tabs key={initialTab} defaultValue={initialTab}>
         <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
-          <TabsTrigger value="events">Zdarzenia ({data.events.length})</TabsTrigger>
           <TabsTrigger value="matches">Dopasowania ({data.procurements.length})</TabsTrigger>
+          <TabsTrigger value="events">Zdarzenia ({data.events.length})</TabsTrigger>
           <TabsTrigger value="catalog">
             Katalog ({data.catalog.length}){proposedCatalog.length > 0 && ` · ${proposedCatalog.length} do zatwierdzenia`}
           </TabsTrigger>
           <TabsTrigger value="history">Historia</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="events">
-          {data.events.length === 0 ? (
-            <NothingHere text="Brak zdarzeń do weryfikacji. Wzbogać projekty lub uruchom analizę AI." />
-          ) : (
-            <div className="flex flex-col gap-4">
-              {data.events.map((e) => (
-                <RiskEventCard
-                  key={e.id}
-                  event={e}
-                  source={e.source_id ? data.sources[e.source_id] : null}
-                  catalog={approvedCatalog}
-                  actions={eventActions}
-                  projectLabel={`${e.project_id} ${e.project_title.slice(0, 60)}`}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
 
         <TabsContent value="matches">
           {data.procurements.length === 0 ? (
@@ -101,6 +93,33 @@ export function ReviewView({ data, eventActions, decideProcurement, assignProcur
                 ))}
               </ul>
             </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="events">
+          {data.events.length === 0 ? (
+            <NothingHere text="Brak zdarzeń do weryfikacji. Wzbogać projekty lub uruchom analizę AI." />
+          ) : (
+            <div className="flex flex-col gap-6">
+              <p className="text-sm text-muted-foreground">
+                Zdarzenia pogrupowane według projektów. Rozwiń wiersz, aby zobaczyć przyczynę, wpływ, cytat i źródło; ✓ zatwierdza, ✗ odrzuca.
+              </p>
+              {eventsByProject.map(({ projectId, title, events }) => (
+                <section key={projectId} className="flex flex-col">
+                  <h3 className="flex items-baseline gap-2 text-sm font-semibold">
+                    <Link href={`/projects/${encodeURIComponent(projectId)}`} className="hover:underline">
+                      <span className="font-mono text-xs text-muted-foreground">{projectId}</span> {title}
+                    </Link>
+                    <span className="font-normal text-muted-foreground">{events.length}</span>
+                  </h3>
+                  <ul className="mt-1 flex flex-col">
+                    {events.map((e) => (
+                      <RiskEventRow key={e.id} event={e} source={e.source_id ? data.sources[e.source_id] : null} catalog={approvedCatalog} actions={eventActions} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
           )}
         </TabsContent>
 

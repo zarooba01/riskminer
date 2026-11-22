@@ -14,7 +14,6 @@ import { assignProcurement, buildProjectRecords, dropUnconfirmedEvents, enrichPr
 import { normalizeNip, normalizeNoticeNumber } from "@/lib/ingest/bzp";
 import { projectColumns } from "@/lib/ingest/columns";
 import { parseProjectsFile, rowsFromTable, type ProjectRow } from "@/lib/ingest/xlsx";
-import { compareModels } from "@/lib/llm/compare";
 import { llmConfig } from "@/lib/llm/config";
 import { analyzeProjectRisks } from "@/lib/llm/tasks/risk-events";
 import { db } from "@/lib/supabase/admin";
@@ -214,24 +213,6 @@ export async function analyzeProjectAction(projectId: string): Promise<ActionRes
     revalidatePath("/", "layout");
     const cost = result.cached ? "wynik z pamięci podręcznej (0 USD)" : `koszt ${result.costUsd?.toFixed(5) ?? "?"} USD`;
     return { ok: true, message: `Model ${llmConfig.model}: ${result.saved} propozycji zdarzeń do weryfikacji, ${cost}.` };
-  } catch (error) {
-    return fail(error);
-  }
-}
-
-export async function compareModelsAction(projectId: string, models: string[]): Promise<ActionResult> {
-  await requireUser();
-  try {
-    const allowed = models.filter((m) => /^[a-z0-9-]+\/[a-z0-9.-]+$/i.test(m)).slice(0, 8);
-    if (!allowed.length) return { ok: false, message: "Wybierz co najmniej jeden model." };
-    const { results, spent } = await compareModels(projectId, allowed);
-    revalidatePath("/llm");
-    const failed = results.filter((r) => !r.skipped && "error" in r && r.error).length;
-    const skipped = results.filter((r) => r.skipped).length;
-    return {
-      ok: failed < results.length,
-      message: `Porównanie: ${results.length} modeli, koszt ${spent.toFixed(4)} USD${failed ? `, błędy: ${failed}` : ""}${skipped ? `, pominięto ${skipped} (limit budżetu)` : ""}.`,
-    };
   } catch (error) {
     return fail(error);
   }

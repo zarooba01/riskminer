@@ -63,7 +63,7 @@ BZP API (kopia bzp.cytr.us / ezamowienia.gov.pl)
 6. **Zmiany umowy**: ogłoszenie o wykonaniu podaje ponumerowaną listę zmian, a każda mogła mieć wcześniej osobne ogłoszenie o zmianie (bez numeru). Łączymy je po kwocie (do 5% różnicy przy tej samej przyczynie) albo po przyczynie i opisie; głównym źródłem jest ogłoszenie o zmianie (data, pełny opis), pozostałe trafiają do `related_source_ids`.
 7. **Źródła dodatkowe** (`src/lib/ingest/external.ts`, tabela `rm_external_checks`): adres strony postępowania z pkt 3.1 ogłoszenia o zamówieniu → lista dokumentów, odczyt PDF (informacja o kwocie, z otwarcia ofert, o wyborze oferty), sprawdzenie numeru BZP, tytułu i wartości umowy; TED — wyszukiwanie po nazwie zamawiającego i podobieństwie tytułu (próg 70%). Wynik „nie znaleziono” też jest zapisywany z podstawą (np. zamówienie poniżej progów UE). Potwierdzenie na stronie zamawiającego dopisujemy do podstawy niepewnego dopasowania.
 
-## Ocena nowej inwestycji (`/assessments/new`, zapisane oceny: `/assessments`, opis metody: `/methodology`)
+## Ocena nowej inwestycji (`/assessments/new`, zapisane oceny: `/assessments`)
 
 Urzędnik opisuje plan zwykłym językiem („Chcemy wybudować kanalizację sanitarną w Góraszce, woj. mazowieckie, ok. 3 km, 4 mln zł, 12 miesięcy; znane warunki: kolizje z uzbrojeniem”) i/lub wgrywa do 5 dokumentów PDF/DOCX. Formularz nie ma osobnych pól — parametry odczytujemy z tekstu, a w wyniku można je poprawić (zakładka „Założenia”). Pole „Użyj modelu AI do analizy” (domyślnie wyłączone) przełącza ocenę w tryb AI — wtedy analizy deterministycznej nie ma (pkt 6). Wynik to rekordy w bazie: `rm_assessments`, `rm_assessment_matches` i `rm_assessment_items` (migracja `0008_assessments.sql`).
 
@@ -135,7 +135,7 @@ Bez kont użytkowników witrynę chroni hasło: `src/proxy.ts` przekierowuje na 
 src/lib/ingest      import XLSX, klient BZP, wzbogacenie i łączenie
 src/lib/assess      ocena nowej inwestycji: parametry, przypadki, podobieństwo, statystyka, ryzyka, zapis
 src/lib/rm          model danych (typy), parser ogłoszeń, reguły, zapytania, server actions, eksport
-src/lib/llm         konfiguracja modeli, cennik, runTask (zapis + cache), porównanie, zadanie risk-events
+src/lib/llm         konfiguracja modeli, cennik, runTask (zapis + cache), zadanie risk-events
 src/components/rm   wspólne elementy: pochodzenie danych, źródło, karta zdarzenia
 src/components/screens  ekrany (dane przez propsy) + historie w src/stories
 src/app/(app)       pulpit, projekty, weryfikacja, modele, eksport

@@ -214,9 +214,97 @@ export async function getDashboardStats() {
     supabase.from("rm_llm_runs").select("*", head),
   ]);
   const [projects, enriched, notices, contracts, proposed, accepted, runs] = results.map((r) => r.count ?? 0);
-  const { data: spend } = await supabase.from("rm_llm_runs").select("cost_usd");
+  const [{ data: spend }, { data: pendingMatches }] = await Promise.all([
+    supabase.from("rm_llm_runs").select("cost_usd"),
+    supabase.from("rm_procurements").select("project_id").eq("status", "proposed"),
+  ]);
   const costUsd = (spend ?? []).reduce((acc, r) => acc + Number(r.cost_usd ?? 0), 0);
-  return { projects, enriched, notices, contracts, proposed, accepted, runs, costUsd };
+  // Kafel liczy projekty, nie dopasowania: jeden projekt może mieć kilka propozycji przetargu.
+  const matchProjects = new Set((pendingMatches ?? []).map((r) => r.project_id as string)).size;
+  return { projects, enriched, notices, contracts, proposed, accepted, runs, costUsd, matchProjects };
+}
+
+export type ModelUsage = { model: string; calls: number; tokensIn: number; tokensOut: number; costUsd: number; lastUsedAt: string | null };
+
+/** Zużycie modeli z rejestru wywołań (rm_llm_runs): liczba wywołań, tokeny i koszt w USD na model. */
+export async function getLlmUsage(): Promise<ModelUsage[]> {
+  const supabase = db();
+  const usage = new Map<string, ModelUsage>();
+  const page = 1000;
+  for (let from = 0; ; from += page) {
+    const { data, error } = await supabase.from("rm_llm_runs").select("model,tokens_in,tokens_out,cost_usd,created_at").order("created_at").range(from, from + page - 1);
+    if (error) throw new Error(error.message);
+    for (const r of data ?? []) {
+      const u = usage.get(r.model) ?? { model: r.model as string, calls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, lastUsedAt: null };
+      u.calls += 1;
+      u.tokensIn += Number(r.tokens_in ?? 0);
+      u.tokensOut += Number(r.tokens_out ?? 0);
+      u.costUsd += Number(r.cost_usd ?? 0);
+      u.lastUsedAt = r.created_at as string;
+      usage.set(u.model, u);
+    }
+    if (!data || data.length < page) break;
+  }
+  return [...usage.values()];
+}
+
+export type QueueFlowDay = { date: string; created: number | null; resolved: number | null };
+export type QueueFlow = { days: QueueFlowDay[]; historyFrom: string | null };
+
+const FLOW_TIME_ZONE = "Europe/Warsaw";
+const dayKey = (iso: string | Date) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: FLOW_TIME_ZONE });
+
+/**
+ * Napływ i rozpatrywanie spraw w kolejce weryfikacji (dopasowania + zdarzenia) — dzień po dniu, łącznie z dzisiejszym.
+ * Nowa sprawa: propozycja dopasowania (bez automatycznie przyjętych i ręcznie przypisanych) lub zdarzenia (bez dodanych
+ * przez eksperta) — wg dnia dodania. Rozpatrzona: decyzja eksperta accept / edit / reject z historii decyzji.
+ * Dni sprzed najstarszego zapisu nie mają historii (null), dni z historią bez aktywności to 0.
+ */
+export async function getQueueFlow(days = 30): Promise<QueueFlow> {
+  const supabase = db();
+  const today = dayKey(new Date());
+  const keys = Array.from({ length: days }, (_, i) => {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (days - 1 - i));
+    return d.toISOString().slice(0, 10);
+  });
+  // Margines doby na strefę czasową; nadmiarowe rekordy odpadają przy grupowaniu po dniu.
+  const since = new Date(`${keys[0]}T00:00:00Z`);
+  since.setUTCDate(since.getUTCDate() - 1);
+  const sinceIso = since.toISOString();
+
+  const queueProcs = () => supabase.from("rm_procurements").select("created_at").neq("match_method", "manual").lt("match_confidence", 1);
+  const queueEvents = () => supabase.from("rm_risk_events").select("created_at").neq("origin", "expert");
+  const decisions = () =>
+    supabase.from("rm_decisions").select("created_at").in("entity", ["procurement", "risk_event"]).in("action", ["accept", "edit", "reject"]);
+
+  const [procs, events, decided, firstProc, firstEvent, firstDecision] = await Promise.all([
+    queueProcs().gte("created_at", sinceIso).limit(10000),
+    queueEvents().gte("created_at", sinceIso).limit(10000),
+    decisions().gte("created_at", sinceIso).limit(10000),
+    queueProcs().order("created_at").limit(1),
+    queueEvents().order("created_at").limit(1),
+    decisions().order("created_at").limit(1),
+  ]);
+
+  const firsts = [firstProc, firstEvent, firstDecision].flatMap((r) => (r.data ?? []).map((x) => dayKey(x.created_at as string)));
+  const historyFrom = firsts.length ? firsts.sort()[0] : null;
+
+  const tally = (rows: { created_at: string }[] | null) => {
+    const counts = new Map<string, number>();
+    for (const r of rows ?? []) counts.set(dayKey(r.created_at), (counts.get(dayKey(r.created_at)) ?? 0) + 1);
+    return counts;
+  };
+  const created = tally([...(procs.data ?? []), ...(events.data ?? [])] as { created_at: string }[]);
+  const resolved = tally(decided.data as { created_at: string }[] | null);
+
+  return {
+    historyFrom,
+    days: keys.map((date) => {
+      const known = historyFrom !== null && date >= historyFrom;
+      return { date, created: known ? (created.get(date) ?? 0) : null, resolved: known ? (resolved.get(date) ?? 0) : null };
+    }),
+  };
 }
 
 export type DashboardStats = Awaited<ReturnType<typeof getDashboardStats>>;

@@ -1,4 +1,5 @@
 import { TrendingDownIcon, TrendingUpIcon, type LucideIcon } from "lucide-react";
+import Link from "next/link";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -11,9 +12,11 @@ type StatCardProps = {
   change?: string;
   trend?: "up" | "down";
   hint?: string;
+  /** Mały skrót na dole kafla, np. „Zobacz projekty →”. */
+  link?: { href: string; label: string };
 };
 
-export function StatCard({ label, value, icon: Icon, change, trend, hint }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, change, trend, hint, link }: StatCardProps) {
   const TrendIcon = trend === "down" ? TrendingDownIcon : TrendingUpIcon;
 
   return (
@@ -41,6 +44,13 @@ export function StatCard({ label, value, icon: Icon, change, trend, hint }: Stat
           </p>
         )}
       </CardContent>
+      {link && (
+        <div className="mt-auto px-(--card-spacing)">
+          <Link href={link.href} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
+            {link.label}
+          </Link>
+        </div>
+      )}
     </Card>
   );
 }

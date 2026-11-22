@@ -1,189 +1,108 @@
+import { BotIcon, CoinsIcon, LogInIcon, LogOutIcon } from "lucide-react";
+
 import { PageHeader } from "@/components/layout/page-header";
+import { StatCard } from "@/components/layout/stat-card";
 import { Badge } from "@/components/ui/badge";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { usd, type ActionResult } from "@/lib/rm/format";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { usd } from "@/lib/rm/format";
 
-import { CompareForm } from "./compare-form";
-
-export type ModelMetric = {
-  model: string;
+export type ModelInfo = {
+  id: string;
   region: string;
-  createdAt: string;
-  validSchema: boolean;
-  error: string | null;
-  latencyMs: number | null;
-  tokensIn: number | null;
-  tokensOut: number | null;
-  costUsd: number | null;
-  costSource: string | null;
-  events: number;
-  codes: string[];
-  quotesVerified: number;
-  precision: number | null;
-  recall: number | null;
-  output: { events?: { risk_code: string; title: string; quote: string }[]; data_gaps?: string[] } | null;
+  /** Cena za 1M tokenów (wejście / wyjście) z cennika AI Gateway albo „cena nieznana”. */
+  price: string;
+  production: boolean;
+  calls: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  lastUsedAt: string | null;
 };
 
 type Props = {
-  projects: { id: string; title: string }[];
-  selectedProject: string | null;
-  models: { id: string; region: string; price: string }[];
-  metrics: ModelMetric[];
-  goldCodes: string[];
+  models: ModelInfo[];
   productionModel: string;
-  compare: (projectId: string, models: string[]) => Promise<ActionResult>;
 };
 
-const share = (v: number | null) => (v == null ? "—" : `${Math.round(v * 100)}%`);
+const tokens = (v: number) => v.toLocaleString("pl-PL");
+const dateTime = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("pl-PL", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Warsaw" }) : "—";
 
-/** Kalkulacja kosztu jednego nowego przetargu (szacunek z planu, ceny AI Gateway 11.2026). */
-const costTable = [
-  { model: "alibaba/qwen3.7-flash", pipeline: 0.003, naive: 0.04 },
-  { model: "openai/gpt-5-nano", pipeline: 0.007, naive: 0.07 },
-  { model: "deepseek/deepseek-v4-flash", pipeline: 0.01, naive: 0.16 },
-  { model: "anthropic/claude-haiku-5.5", pipeline: 0.011, naive: 0.13 },
-  { model: "mistral/ministral-14b", pipeline: 0.014, naive: 0.24 },
-  { model: "google/gemini-3.1-flash-lite", pipeline: 0.03, naive: 0.33 },
-  { model: "anthropic/claude-sonnet-5.5", pipeline: 0.217, naive: 2.63 },
-];
+/** Modele AI: konfiguracja, region przetwarzania, cennik i faktyczne zużycie (tokeny, koszt w USD) z rejestru wywołań. */
+export function LlmView({ models, productionModel }: Props) {
+  const total = models.reduce(
+    (acc, m) => ({ calls: acc.calls + m.calls, tokensIn: acc.tokensIn + m.tokensIn, tokensOut: acc.tokensOut + m.tokensOut, costUsd: acc.costUsd + m.costUsd }),
+    { calls: 0, tokensIn: 0, tokensOut: 0, costUsd: 0 },
+  );
 
-export function LlmView({ projects, selectedProject, models, metrics, goldCodes, productionModel, compare }: Props) {
   return (
     <>
       <PageHeader
-        title="Porównanie modeli"
-        description={`Ten sam wsad, różne modele: koszt, czas, poprawność struktury i zgodność z decyzjami eksperta. Model produkcyjny: ${productionModel}.`}
+        title="Modele"
+        description={`Modele AI dostępne przez Vercel AI Gateway, ich cennik i zużycie. Model produkcyjny: ${productionModel} (zmiana w zmiennej LLM_MODEL, bez zmian w kodzie).`}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Uruchom porównanie</CardTitle>
-            <CardDescription>Połączenie przez Vercel AI Gateway — jeden klucz, model wskazany identyfikatorem „dostawca/model”.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <CompareForm projects={projects} selectedProject={selectedProject} models={models} compare={compare} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Ile kosztuje analiza jednego nowego przetargu</CardTitle>
-            <CardDescription>
-              Szacunek dla paczki ~80 tys. tokenów (ogłoszenie, SWZ, PPU, OPZ). Pipeline: najpierw reguły i statystyka (0 zł), LLM tylko na ~25% tekstu.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Pipeline</TableHead>
-                  <TableHead className="text-right">Naiwnie</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {costTable.map((row) => (
-                  <TableRow key={row.model}>
-                    <TableCell className="font-mono text-xs">{row.model}</TableCell>
-                    <TableCell className="text-right tabular-nums">${row.pipeline.toFixed(3)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">${row.naive.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Rekomendacja: hybryda — ekstrakcja na najtańszym modelu, który przejdzie test jakości, synteza po polsku na Haiku / GPT-luna ≈ 0,005–0,008 USD na przetarg.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Wywołania AI" value={tokens(total.calls)} icon={BotIcon} hint="łącznie, wszystkie modele" />
+        <StatCard label="Tokeny wejściowe" value={tokens(total.tokensIn)} icon={LogInIcon} hint="wysłane do modeli" />
+        <StatCard label="Tokeny wyjściowe" value={tokens(total.tokensOut)} icon={LogOutIcon} hint="wygenerowane przez modele" />
+        <StatCard label="Koszt łącznie" value={usd(total.costUsd)} icon={CoinsIcon} hint="wg AI Gateway lub cennika" />
       </div>
-
-      {selectedProject && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Wyniki dla {selectedProject}</CardTitle>
-            <CardDescription>
-              Złoty zbiór = kody ryzyk zatwierdzone przez eksperta:{" "}
-              {goldCodes.length ? goldCodes.join(", ") : "brak — zatwierdź zdarzenia w Weryfikacji, aby policzyć precyzję i czułość"}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {metrics.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Brak przebiegów dla tego projektu.</p>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Model</TableHead>
-                        <TableHead className="text-right">Koszt</TableHead>
-                        <TableHead className="text-right">Czas</TableHead>
-                        <TableHead className="text-right">Tokeny we/wy</TableHead>
-                        <TableHead>Schemat</TableHead>
-                        <TableHead className="text-right">Zdarzenia</TableHead>
-                        <TableHead className="text-right">Cytaty OK</TableHead>
-                        <TableHead className="text-right">Precyzja</TableHead>
-                        <TableHead className="text-right">Czułość</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {metrics.map((m) => (
-                        <TableRow key={m.model}>
-                          <TableCell>
-                            <span className="font-mono text-xs">{m.model}</span>
-                            <p className="text-xs text-muted-foreground">{m.region}</p>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {usd(m.costUsd)}
-                            {m.costSource === "pricing" && <p className="text-muted-foreground">z cennika</p>}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">{m.latencyMs != null ? `${(m.latencyMs / 1000).toFixed(1)} s` : "—"}</TableCell>
-                          <TableCell className="text-right tabular-nums text-xs">
-                            {m.tokensIn ?? "—"} / {m.tokensOut ?? "—"}
-                          </TableCell>
-                          <TableCell>{m.validSchema ? <Badge variant="outline">poprawny</Badge> : <Badge variant="destructive">błąd</Badge>}</TableCell>
-                          <TableCell className="text-right">{m.events}</TableCell>
-                          <TableCell className="text-right">{share(m.quotesVerified)}</TableCell>
-                          <TableCell className="text-right">{share(m.precision)}</TableCell>
-                          <TableCell className="text-right">{share(m.recall)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-                <Accordion type="multiple">
-                  {metrics.map((m) => (
-                    <AccordionItem key={m.model} value={m.model}>
-                      <AccordionTrigger>
-                        <span className="font-mono text-xs">{m.model}</span> — {m.codes.join(", ") || (m.error ? "błąd" : "brak zdarzeń")}
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        {m.error && <p className="text-sm text-destructive">{m.error}</p>}
-                        <ul className="flex flex-col gap-2">
-                          {m.output?.events?.map((e, i) => (
-                            <li key={i} className="rounded-lg border p-2 text-sm">
-                              <Badge variant="outline" className="mr-2 font-mono">
-                                {e.risk_code}
-                              </Badge>
-                              {e.title}
-                              <p className="mt-1 text-xs italic text-muted-foreground">„{e.quote}”</p>
-                            </li>
-                          ))}
-                        </ul>
-                        {!!m.output?.data_gaps?.length && (
-                          <p className="mt-2 text-xs text-muted-foreground">Braki danych wskazane przez model: {m.output.data_gaps.join("; ")}</p>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Modele i zużycie</CardTitle>
+          <CardDescription>
+            Cena za 1 mln tokenów (wejście / wyjście) z cennika AI Gateway. Zużycie z rejestru wywołań — wyniki z pamięci podręcznej nie są liczone
+            ponownie.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Model</TableHead>
+                <TableHead>Cena za 1M tok.</TableHead>
+                <TableHead className="text-right">Wywołania</TableHead>
+                <TableHead className="text-right">Tokeny wejściowe</TableHead>
+                <TableHead className="text-right">Tokeny wyjściowe</TableHead>
+                <TableHead className="text-right">Koszt</TableHead>
+                <TableHead className="text-right">Ostatnie użycie</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {models.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs">{m.id}</span>
+                      {m.production && <Badge>produkcyjny</Badge>}
+                    </span>
+                    <p className="text-xs text-muted-foreground">{m.region}</p>
+                  </TableCell>
+                  <TableCell className="text-xs tabular-nums">{m.price}</TableCell>
+                  <TableCell className="text-right tabular-nums">{tokens(m.calls)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{tokens(m.tokensIn)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{tokens(m.tokensOut)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{usd(m.costUsd)}</TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground tabular-nums">{dateTime(m.lastUsedAt)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell colSpan={2} className="font-medium">
+                  Razem
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{tokens(total.calls)}</TableCell>
+                <TableCell className="text-right tabular-nums">{tokens(total.tokensIn)}</TableCell>
+                <TableCell className="text-right tabular-nums">{tokens(total.tokensOut)}</TableCell>
+                <TableCell className="text-right tabular-nums">{usd(total.costUsd)}</TableCell>
+                <TableCell />
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </CardContent>
+      </Card>
     </>
   );
 }
