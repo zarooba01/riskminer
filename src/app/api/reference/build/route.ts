@@ -11,7 +11,7 @@ export async function POST() {
   await requireUser();
   try {
     const r = await buildReferenceBase();
-    return NextResponse.json({ ok: true, ...r, message: `Baza porównawcza: ${r.cases} projektów, ${r.events} zaakceptowanych zdarzeń.` });
+    return NextResponse.json({ ok: true, ...r, message: `Baza porównawcza: ${r.cases} inwestycji, ${r.events} zaakceptowanych zdarzeń.` });
   } catch (error) {
     return NextResponse.json({ ok: false, message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

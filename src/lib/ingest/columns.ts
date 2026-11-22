@@ -28,7 +28,7 @@ export type ProjectColumn = {
 
 export const projectColumns: ProjectColumn[] = [
   { header: "Lp.", description: "Numer kolejny w zestawie (opcjonalny).", example: "1" },
-  { header: "Identyfikator rekordu", field: "id", required: true, description: "Unikalny identyfikator projektu w bazie.", example: "RM-2026-023" },
+  { header: "Identyfikator rekordu", field: "id", required: true, description: "Unikalny identyfikator inwestycji w bazie.", example: "RM-2026-023" },
   { header: "Rodzaj identyfikatora odbiorcy", description: "Rodzaj krajowego numeru identyfikacyjnego.", example: "NIP" },
   { header: "Identyfikator odbiorcy", field: "beneficiary_nip", recommended: true, description: "NIP zamawiającego (10 cyfr, sprawdzana suma kontrolna) — klucz łączenia z BZP.", example: "9121715754" },
   { header: "Nazwa odbiorcy", field: "beneficiary_name", recommended: true, description: "Nazwa odbiorcy środków (zamawiającego).", example: "Gmina Oława" },

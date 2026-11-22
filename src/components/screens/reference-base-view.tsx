@@ -39,8 +39,8 @@ export function ReferenceBaseView({ data, rebuild }: Props) {
         <InfoIcon />
         <AlertTitle>Kopia z automatyczną akceptacją (dane demo)</AlertTitle>
         <AlertDescription>
-          Do analizy bierzemy wyłącznie projekty zakończone, z dopasowaniem do BZP i z zaakceptowanymi zdarzeniami ryzyka. Akceptacja w tej kopii jest automatyczna
-          (oznaczenie „Automatyczna akceptacja (dane demo)”) — oryginalne rekordy w Projektach i Weryfikacji pozostają bez zmian, do decyzji eksperta.
+          Do analizy bierzemy wyłącznie inwestycje zakończone, z dopasowaniem do BZP i z zaakceptowanymi zdarzeniami ryzyka. Akceptacja w tej kopii jest automatyczna
+          (oznaczenie „Automatyczna akceptacja (dane demo)”) — oryginalne rekordy w Zrealizowanych inwestycjach i Weryfikacji pozostają bez zmian, do decyzji eksperta.
           {lastBuild && ` Ostatnia budowa: ${lastBuild.at.slice(0, 16).replace("T", " ")}.`}
         </AlertDescription>
       </Alert>
@@ -49,7 +49,7 @@ export function ReferenceBaseView({ data, rebuild }: Props) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <DatabaseIcon className="size-4" aria-hidden /> Zakończone projekty ({cases.length})
+              <DatabaseIcon className="size-4" aria-hidden /> Zakończone inwestycje ({cases.length})
             </CardTitle>
             <CardDescription>
               Zaakceptowanych zdarzeń: {events}. Dopasowanie do BZP zatwierdzone wcześniej: {cases.length - auto}, zaakceptowane automatycznie przy klonowaniu: {auto}.
@@ -59,7 +59,7 @@ export function ReferenceBaseView({ data, rebuild }: Props) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Projekt</TableHead>
+                  <TableHead>Inwestycja</TableHead>
                   <TableHead className="hidden lg:table-cell">Podsektor</TableHead>
                   <TableHead className="text-right">Wartość umowy</TableHead>
                   <TableHead className="text-right">Zmiana kosztu</TableHead>
@@ -105,7 +105,7 @@ export function ReferenceBaseView({ data, rebuild }: Props) {
         <Empty>
           <EmptyHeader>
             <EmptyTitle>Baza porównawcza jest pusta</EmptyTitle>
-            <EmptyDescription>Użyj „Odbuduj z bazy roboczej”, żeby skopiować zakończone projekty z zaakceptowanymi danymi.</EmptyDescription>
+            <EmptyDescription>Użyj „Odbuduj z bazy roboczej”, żeby skopiować zakończone inwestycje z zaakceptowanymi danymi.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       )}
@@ -114,7 +114,7 @@ export function ReferenceBaseView({ data, rebuild }: Props) {
         <Card>
           <CardHeader>
             <CardTitle>Pominięte przy ostatniej budowie ({lastBuild.skipped.length})</CardTitle>
-            <CardDescription>Projekty, które nie spełniły warunków bazy porównawczej.</CardDescription>
+            <CardDescription>Inwestycje, które nie spełniły warunków bazy porównawczej.</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="flex list-disc flex-col gap-1 pl-5 text-sm">

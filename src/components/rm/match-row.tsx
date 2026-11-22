@@ -102,7 +102,7 @@ export function MatchRow({ match, decide, assign }: Props) {
                 </MatchDialog>
               )}
               <Link href={`/projects/${encodeURIComponent(match.project_id)}`} className="text-xs text-primary hover:underline">
-                Otwórz projekt
+                Otwórz inwestycję
               </Link>
             </span>
           </div>

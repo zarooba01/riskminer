@@ -316,7 +316,9 @@ async function buildContracts(procurementId: string, notices: StoredNotice[]) {
       lowest_offer: r?.lowestOffer ?? null,
       highest_offer: r?.highestOffer ?? null,
       cost_deviation_pct: paid && initialValue ? Math.round(((paid - initialValue) / initialValue) * 10000) / 100 : null,
-      delay_days: plannedEnd && actualEnd ? Math.max(0, daysBetween(plannedEnd, actualEnd)) : null,
+      // Ogłoszenie o wykonaniu odpowiada wprost, czy umowę wykonano w pierwotnym terminie (pkt 5.3). „Tak” wygrywa
+      // z terminem wyliczonym jako podpisanie + okres (okres bywa liczony np. od przekazania placu budowy).
+      delay_days: p.onTime === true ? 0 : plannedEnd && actualEnd ? Math.max(0, daysBetween(plannedEnd, actualEnd)) : null,
       source_ids: used.map((n) => n.sourceId),
       updated_at: new Date().toISOString(),
     };

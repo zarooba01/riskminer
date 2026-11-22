@@ -46,9 +46,9 @@ export function ClearDataButton({ projectCount, clearAction }: Props) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Wyczyścić wszystkie dane projektów?</AlertDialogTitle>
+          <AlertDialogTitle>Wyczyścić wszystkie dane inwestycji?</AlertDialogTitle>
           <AlertDialogDescription>
-            Zostanie usuniętych {plural(projectCount, ["projekt", "projekty", "projektów"])} razem z dopasowaniami, ogłoszeniami, umowami, zdarzeniami, decyzjami
+            Zostanie usuniętych {plural(projectCount, ["inwestycja", "inwestycje", "inwestycji"])} razem z dopasowaniami, ogłoszeniami, umowami, zdarzeniami, decyzjami
             ekspertów i przebiegami AI. Katalog ryzyk zostanie. Tej operacji nie można cofnąć.
           </AlertDialogDescription>
         </AlertDialogHeader>

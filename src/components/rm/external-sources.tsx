@@ -41,7 +41,7 @@ export function ExternalSources({ projectId, bzpNotices, checks }: Props) {
           return (
             <li key={kind} className="flex flex-col gap-1 rounded-lg border border-dashed p-3">
               <span className="text-sm font-medium">{sourceLabel[kind]}</span>
-              <p className="text-xs text-muted-foreground">Jeszcze nie sprawdzono — uruchom ponowne wzbogacenie projektu.</p>
+              <p className="text-xs text-muted-foreground">Jeszcze nie sprawdzono — uruchom ponowne wzbogacenie inwestycji.</p>
             </li>
           );
         }

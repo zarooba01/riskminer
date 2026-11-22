@@ -71,7 +71,8 @@ export async function proposeRuleEvents(input: { projectId: string; contractId: 
   const valueChanges = allChanges.filter((ch) => ch.value_change);
   const label = (ch: ContractChange) => `zmiana nr ${ch.change_no ?? "—"}${ch.legal_basis ? ` (${ch.legal_basis.replace(/\s*ustawy\s*$/, "")})` : ""}`;
 
-  if (c.delay_days && c.delay_days > 0) {
+  // Bez zdarzenia, gdy ogłoszenie o wykonaniu wprost podaje wykonanie w pierwotnym terminie (pkt 5.3: „Tak”).
+  if (c.delay_days && c.delay_days > 0 && c.on_time !== true) {
     const src = lineWith(notices, "ContractPerformingNotice", /5\.3\.\)/) ?? lineWith(notices, "ContractPerformingNotice", /5\.2\.\)/);
     const lastTerm = [...termChanges].filter((ch) => ch.new_end_date).sort((a, b) => a.new_end_date!.localeCompare(b.new_end_date!)).at(-1);
     const withinAmended = Boolean(lastTerm?.new_end_date && c.actual_end && c.actual_end <= lastTerm.new_end_date);

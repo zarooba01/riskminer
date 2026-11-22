@@ -35,7 +35,7 @@ export async function importProjects(_: ActionResult | null, formData: FormData)
     } else {
       const bundled = await readFile(path.join(process.cwd(), "data/Risk_Miner_dane_projekty.xlsx"));
       buffer = bundled.buffer.slice(bundled.byteOffset, bundled.byteOffset + bundled.byteLength) as ArrayBuffer;
-      name = "Risk_Miner_dane_projekty.xlsx (zestaw organizatora)";
+      name = "Risk_Miner_dane_projekty.xlsx (dane startowe)";
     }
 
     const { rows, warnings } = await parseProjectsFile(buffer, name.replace(/ \(.*\)$/, ""));
@@ -53,7 +53,7 @@ export async function importProjects(_: ActionResult | null, formData: FormData)
     if (error) throw new Error(error.message);
 
     revalidatePath("/", "layout");
-    return { ok: true, message: `Zaimportowano ${rows.length} projektów.${warnings.length ? ` Uwagi: ${warnings.join(" ")}` : ""}` };
+    return { ok: true, message: `Zaimportowano ${rows.length} inwestycji.${warnings.length ? ` Uwagi: ${warnings.join(" ")}` : ""}` };
   } catch (error) {
     return fail(error);
   }
@@ -368,7 +368,7 @@ export async function clearProjectData(): Promise<ActionResult> {
     }
     await supabase.from("rm_decisions").insert({ entity: "system", entity_id: "all", action: "clear_data", after: { projects: projects ?? 0 } });
     revalidatePath("/", "layout");
-    return { ok: true, message: `Usunięto dane ${projects ?? 0} projektów. Katalog ryzyk został bez zmian.` };
+    return { ok: true, message: `Usunięto dane ${projects ?? 0} inwestycji. Katalog ryzyk został bez zmian.` };
   } catch (error) {
     return fail(error);
   }
@@ -494,7 +494,7 @@ export async function rebuildReferenceBase(): Promise<ActionResult> {
   try {
     const r = await buildReferenceBase();
     revalidatePath("/reference");
-    return { ok: true, message: `Baza porównawcza: ${r.cases} projektów, ${r.events} zaakceptowanych zdarzeń. Oryginały bez zmian. Zaktualizuj oceny, żeby użyć nowej bazy.` };
+    return { ok: true, message: `Baza porównawcza: ${r.cases} inwestycji, ${r.events} zaakceptowanych zdarzeń. Oryginały bez zmian. Zaktualizuj oceny, żeby użyć nowej bazy.` };
   } catch (error) {
     return fail(error);
   }

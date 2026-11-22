@@ -83,8 +83,12 @@ function rowsFor(contract: Contract, changes: ContractChange[], notices: Notice[
     label: "Termin zakończenia",
     plan: { value: contract.planned_end ? date(contract.planned_end) : null, cite: { label: `pierwotny${contract.initial_months ? ` · ${contract.initial_months} mies.` : ""}`, sourceId: result?.source_id, quote: "Okres realizacji zamówienia" } },
     actual: { value: contract.actual_end ? date(contract.actual_end) : null, cite: { label: performing ? `wykonanie · ${performing.notice_number}` : "wykonanie", sourceId: performing?.source_id, quote: "Termin wykonania umowy" } },
-    diff: contract.planned_end && contract.actual_end ? signedDays(daysDiff(contract.planned_end, contract.actual_end)) : null,
-    alert: (contract.delay_days ?? 0) > 0,
+    diff: contract.on_time === true ? "w terminie" : contract.planned_end && contract.actual_end ? signedDays(daysDiff(contract.planned_end, contract.actual_end)) : null,
+    alert: (contract.delay_days ?? 0) > 0 && contract.on_time !== true,
+    note:
+      contract.on_time === true && contract.planned_end && contract.actual_end && contract.actual_end > contract.planned_end
+        ? "wg ogłoszenia o wykonaniu umowę wykonano w pierwotnym terminie — okres realizacji liczono od innej daty niż podpisanie umowy"
+        : undefined,
   });
   if (lastTerm?.new_end_date) {
     const d = contract.actual_end ? daysDiff(lastTerm.new_end_date, contract.actual_end) : null;

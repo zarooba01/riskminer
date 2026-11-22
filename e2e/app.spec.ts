@@ -37,7 +37,7 @@ test("strona startowa prowadzi do pulpitu i nawigacji", async ({ page, isMobile 
 
   const nav = isMobile ? page.getByRole("navigation", { name: "Nawigacja główna" }) : page.locator("[data-slot=sidebar]");
   for (const [link, heading] of [
-    ["Projekty", "Projekty"],
+    ["Zrealizowane inwestycje", "Zrealizowane inwestycje"],
     ["Weryfikacja", "Weryfikacja"],
     ["Modele", "Modele"],
     ["Nowa inwestycja", "Ocena nowej inwestycji"],
@@ -86,7 +86,7 @@ test.describe("dane (Supabase)", () => {
   test("projekt pokazuje KPI, ryzyka i źródło w szczegółach", async ({ page }) => {
     await unlock(page);
     await page.goto("/projects");
-    await page.getByLabel("Szukaj projektów").fill("Godzikowice");
+    await page.getByLabel("Szukaj inwestycji").fill("Godzikowice");
     await page.getByRole("link", { name: /Godzikowice/ }).first().click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Godzikowice");
     await expect(page.getByText("Umowa", { exact: true })).toBeVisible();
@@ -130,7 +130,7 @@ test.describe("dane (Supabase)", () => {
     await expect(page).toHaveURL(/\/sources\//);
     await expect(page.getByText("Zaznaczony fragment, na którym oparto ustalenie:")).toBeVisible();
     await expect(page.locator("mark#fragment")).toBeVisible();
-    await page.getByRole("link", { name: "Wróć do projektu" }).click();
+    await page.getByRole("link", { name: "Wróć do inwestycji" }).click();
     await expect(page).toHaveURL(/\/projects\/RM-2026-003$/);
   });
 

@@ -144,7 +144,7 @@ export async function parseProjectsXlsx(buffer: ArrayBuffer): Promise<ParseResul
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await normalizeSpreadsheet(buffer));
   const sheet = workbook.getWorksheet("Projekty") ?? workbook.worksheets[0];
-  if (!sheet) throw new Error("Plik nie zawiera arkusza z projektami.");
+  if (!sheet) throw new Error("Plik nie zawiera arkusza z inwestycjami.");
 
   // ExcelJS numeruje kolumny od 1 — indeks 0 tablicy values jest pusty.
   const header = (sheet.getRow(1).values as ExcelJS.CellValue[]).slice(1).map((v) => cellText(v));

@@ -1,6 +1,6 @@
 /** Encje dostępne do eksportu: nazwa w URL → tabela + kolumny (bez surowych treści dokumentów). */
 export const exportEntities = {
-  projects: { table: "rm_projects", label: "Projekty", select: "*" },
+  projects: { table: "rm_projects", label: "Inwestycje", select: "*" },
   procurements: { table: "rm_procurements", label: "Postępowania i dopasowania", select: "*" },
   notices: { table: "rm_notices", label: "Ogłoszenia (z polami sparsowanymi)", select: "*" },
   contracts: { table: "rm_contracts", label: "Umowy, koszty i terminy", select: "*" },

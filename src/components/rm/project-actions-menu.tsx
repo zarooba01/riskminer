@@ -36,7 +36,7 @@ export function ProjectActionsMenu({ projectId, contracts = [], enrich, analyze,
     <>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" aria-label="Akcje projektu" disabled={pending}>
+        <Button variant="outline" size="icon" aria-label="Akcje inwestycji" disabled={pending}>
           {pending ? <Spinner /> : <EllipsisIcon />}
         </Button>
       </DropdownMenuTrigger>
@@ -56,8 +56,13 @@ export function ProjectActionsMenu({ projectId, contracts = [], enrich, analyze,
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <a href={`/api/export/projects?format=json&${q}`}>
-            <DownloadIcon /> Eksport projektu (JSON)
+          <a href={`/api/projects/${encodeURIComponent(projectId)}/export?format=json`}>
+            <DownloadIcon /> Eksport rekordu (JSON)
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={`/api/projects/${encodeURIComponent(projectId)}/export?format=md`}>
+            <DownloadIcon /> Eksport rekordu (Markdown)
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

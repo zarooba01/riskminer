@@ -70,7 +70,7 @@ export const PulpitBezHistorii: Story = {
 };
 export const PulpitTelefon: Story = { ...Pulpit, ...phone, name: "Pulpit (telefon)" };
 
-export const Projekty: Story = {
+export const ZrealizowaneInwestycje: Story = {
   parameters: path("/projects"),
   render: () => (
     <ProjectsListView
@@ -84,9 +84,9 @@ export const Projekty: Story = {
     />
   ),
 };
-export const ProjektyTelefon: Story = { ...Projekty, ...phone, name: "Projekty (telefon)" };
+export const ZrealizowaneInwestycjeTelefon: Story = { ...ZrealizowaneInwestycje, ...phone, name: "Zrealizowane inwestycje (telefon)" };
 
-export const Projekt: Story = {
+export const Inwestycja: Story = {
   parameters: path("/projects/RM-2026-001"),
   render: () => (
     <ProjectDetailView
@@ -100,7 +100,7 @@ export const Projekt: Story = {
     />
   ),
 };
-export const ProjektTelefon: Story = { ...Projekt, ...phone, name: "Projekt (telefon)" };
+export const InwestycjaTelefon: Story = { ...Inwestycja, ...phone, name: "Inwestycja (telefon)" };
 
 export const Zrodlo: Story = {
   name: "Źródło z zaznaczonym fragmentem",
@@ -136,7 +136,7 @@ export const Eksport: Story = {
   render: () => (
     <ExportView
       entities={[
-        { key: "projects", label: "Projekty", count: 22 },
+        { key: "projects", label: "Inwestycje", count: 22 },
         { key: "events", label: "Zdarzenia ryzyka", count: 55 },
         { key: "contracts", label: "Umowy, koszty i terminy", count: 15 },
       ]}

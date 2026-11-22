@@ -170,8 +170,8 @@ export function ProjectsListView({
   return (
     <>
       <PageHeader
-        title="Projekty"
-        description="Rekordy z pliku organizatora wzbogacone danymi z BZP. Koszt = wypłacono vs wartość umowy; czas = wykonanie vs pierwotny termin."
+        title="Zrealizowane inwestycje"
+        description="Zaimportowane dane uzupełnione o informacje z BZP. Koszt = wypłacono vs wartość umowy; czas = wykonanie vs pierwotny termin."
         actions={
           <>
             {clearAction && <ClearDataButton projectCount={projects.length} clearAction={clearAction} />}
@@ -181,7 +181,7 @@ export function ProjectsListView({
         }
       />
       <div className="flex flex-wrap items-center gap-2">
-        <Input aria-label="Szukaj projektów" placeholder="Szukaj: nazwa, gmina, podsektor…" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-sm" />
+        <Input aria-label="Szukaj inwestycji" placeholder="Szukaj: nazwa, gmina, podsektor…" value={query} onChange={(e) => setQuery(e.target.value)} className="max-w-sm" />
         <div className="flex items-center gap-2 md:hidden">
           <Select value={`${sort.key}:${sort.dir}`} onValueChange={(v) => {
             const [key, dir] = v.split(":") as [SortKey, Sort["dir"]];
@@ -206,8 +206,8 @@ export function ProjectsListView({
       {visible.length === 0 ? (
         <Empty>
           <EmptyHeader>
-            <EmptyTitle>Brak projektów</EmptyTitle>
-            <EmptyDescription>Dodaj projekt albo zaimportuj plik.</EmptyDescription>
+            <EmptyTitle>Brak inwestycji</EmptyTitle>
+            <EmptyDescription>Dodaj inwestycję albo zaimportuj plik.</EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (

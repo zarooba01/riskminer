@@ -55,14 +55,14 @@ export function DashboardView({ stats, flow, model, configError }: Props) {
       )}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
-          label="Projekty"
+          label="Zrealizowane inwestycje"
           value={String(stats?.projects ?? 0)}
           icon={FolderKanbanIcon}
           hint={`wzbogacone: ${stats?.enriched ?? 0}`}
-          link={{ href: "/projects", label: "Zobacz projekty →" }}
+          link={{ href: "/projects", label: "Zobacz inwestycje →" }}
         />
         <StatCard
-          label="Projekty z dopasowaniem do sprawdzenia"
+          label="Inwestycje z dopasowaniem do sprawdzenia"
           value={String(stats?.matchProjects ?? 0)}
           icon={FileSearchIcon}
           hint="propozycje przetargów z BZP"

@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth/session";
 import { addProject, addProjects, assignProcurementAction, clearProjectData, decideProcurement, enrichProjectAction } from "@/lib/rm/actions";
 import { databaseConfigured, listProjects } from "@/lib/rm/queries";
 
-export const metadata: Metadata = { title: "Projekty" };
+export const metadata: Metadata = { title: "Zrealizowane inwestycje" };
 export const dynamic = "force-dynamic";
 
 /** Kolejny identyfikator w schemacie organizatora RM-RRRR-NNN. */

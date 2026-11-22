@@ -83,10 +83,10 @@ export function ReviewView({ data, initialTab = "matches", eventActions, decideP
 
         <TabsContent value="matches">
           {data.procurements.length === 0 ? (
-            <NothingHere text="Wszystkie dopasowania projektów do przetargów w BZP są rozstrzygnięte." />
+            <NothingHere text="Wszystkie dopasowania inwestycji do przetargów w BZP są rozstrzygnięte." />
           ) : (
             <>
-              <p className="pb-2 text-sm text-muted-foreground">Czy projekt z pliku to na pewno ten przetarg w BZP? Najmniej pewne na górze.</p>
+              <p className="pb-2 text-sm text-muted-foreground">Czy inwestycja z pliku to na pewno ten przetarg w BZP? Najmniej pewne na górze.</p>
               <ul className="flex flex-col">
                 {data.procurements.map((p) => (
                   <MatchRow key={p.id} match={p} decide={decideProcurement} assign={assignProcurement} />
@@ -98,11 +98,11 @@ export function ReviewView({ data, initialTab = "matches", eventActions, decideP
 
         <TabsContent value="events">
           {data.events.length === 0 ? (
-            <NothingHere text="Brak zdarzeń do weryfikacji. Wzbogać projekty lub uruchom analizę AI." />
+            <NothingHere text="Brak zdarzeń do weryfikacji. Wzbogać inwestycje lub uruchom analizę AI." />
           ) : (
             <div className="flex flex-col gap-6">
               <p className="text-sm text-muted-foreground">
-                Zdarzenia pogrupowane według projektów. Rozwiń wiersz, aby zobaczyć przyczynę, wpływ, cytat i źródło; ✓ zatwierdza, ✗ odrzuca.
+                Zdarzenia pogrupowane według inwestycji. Rozwiń wiersz, aby zobaczyć przyczynę, wpływ, cytat i źródło; ✓ zatwierdza, ✗ odrzuca.
               </p>
               {eventsByProject.map(({ projectId, title, events }) => (
                 <section key={projectId} className="flex flex-col">

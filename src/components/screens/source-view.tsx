@@ -25,7 +25,7 @@ const kindLabel: Record<string, string> = {
   assessment: "Dokument planowanej inwestycji",
   platform: "Strona postępowania zamawiającego",
   ted: "TED (Dziennik Urzędowy UE)",
-  xlsx: "Plik organizatora",
+  xlsx: "Zaimportowany plik",
   manual: "Wpis ręczny",
 };
 
@@ -58,7 +58,7 @@ export function SourceView({ source, quote, backHref }: Props) {
         {backHref && (
           <Button asChild size="sm" variant="ghost">
             <Link href={backHref}>
-              <ArrowLeftIcon /> Wróć do projektu
+              <ArrowLeftIcon /> Wróć do inwestycji
             </Link>
           </Button>
         )}

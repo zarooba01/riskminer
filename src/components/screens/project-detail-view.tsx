@@ -188,7 +188,7 @@ export function ProjectDetailView({ data, catalog, enrich, analyze, eventActions
       {/* Baner tylko, gdy coś wymaga decyzji */}
       {!project.enriched_at && !procurements.length && !project.enrichment_log.length ? (
         <Alert className="flex flex-wrap items-center justify-between gap-2">
-          <AlertDescription>Projekt nie ma jeszcze danych z BZP.</AlertDescription>
+          <AlertDescription>Inwestycja nie ma jeszcze danych z BZP.</AlertDescription>
           {enrich && (
             <ActionButton size="sm" action={enrich} pendingLabel="Pobieram…">
               Wzbogać z BZP
@@ -314,7 +314,7 @@ export function ProjectDetailView({ data, catalog, enrich, analyze, eventActions
             <Empty>
               <EmptyHeader>
                 <EmptyTitle>Brak ogłoszeń</EmptyTitle>
-                <EmptyDescription>Wzbogać projekt z BZP.</EmptyDescription>
+                <EmptyDescription>Wzbogać inwestycję z BZP.</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}

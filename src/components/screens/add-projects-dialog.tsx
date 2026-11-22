@@ -164,7 +164,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
       summary: split
         ? `${split.summary}${errors ? ` Błędy: ${errors}.` : ""}`
         : all
-          ? `Zakończono dla ${ids.length} ${ids.length === 1 ? "projektu" : "projektów"}.`
+          ? `Zakończono dla ${ids.length} inwestycji.`
           : `Zakończono: ${ok} z ${ids.length}, błędy: ${errors}.`,
       details: [...(split?.details ?? []), ...(s.details ?? [])],
       current: undefined,
@@ -214,8 +214,8 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
     setAdded(result.added);
 
     if (!result.added.length) {
-      update("search", { state: "skipped", summary: "pominięto — brak nowych projektów" });
-      update("build", { state: "skipped", summary: "pominięto — brak nowych projektów" });
+      update("search", { state: "skipped", summary: "pominięto — brak nowych inwestycji" });
+      update("build", { state: "skipped", summary: "pominięto — brak nowych inwestycji" });
       setPhase("finished");
       return;
     }
@@ -230,7 +230,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
       await runPerProject("build", matched, buildAction, "Wzbogacono", summarizeBuild(result.added.length, waiting, notFound));
     } else {
       const split = summarizeBuild(result.added.length, waiting, notFound)(new Map());
-      update("build", { state: "skipped", summary: "Nic do wzbogacenia — brak pewnie dopasowanych projektów.", details: split.details.slice(1) });
+      update("build", { state: "skipped", summary: "Nic do wzbogacenia — brak pewnie dopasowanych inwestycji.", details: split.details.slice(1) });
     }
 
     setPhase("finished");
@@ -254,7 +254,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
     >
       <DialogTrigger asChild>
         <Button>
-          <FileUpIcon /> Importuj projekty
+          <FileUpIcon /> Importuj inwestycje
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -264,7 +264,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
         className="max-h-[90svh] overflow-y-auto sm:max-w-lg"
       >
         <DialogHeader>
-          <DialogTitle>Importuj projekty z pliku</DialogTitle>
+          <DialogTitle>Importuj inwestycje z pliku</DialogTitle>
           <DialogDescription>{phase === "form" ? "Duplikaty zostaną pominięte." : "Import, wyszukiwanie w BZP i wzbogacenie danych."}</DialogDescription>
         </DialogHeader>
 
@@ -276,7 +276,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
                 <Input id="add-file" name="file" type="file" accept=".xlsx,.csv" required />
               </Field>
               <Button type="submit" className="self-center">
-                <FileUpIcon /> Importuj projekty
+                <FileUpIcon /> Importuj inwestycje
               </Button>
             </form>
             <div className="flex flex-col items-center gap-2 rounded-lg border bg-muted/30 p-3">
@@ -302,7 +302,7 @@ export function AddProjectsDialog({ addAction, searchAction = viaApi("search"), 
               <Alert className="border-success/40 bg-success/10">
                 <CheckCircle2Icon className="text-success!" />
                 <AlertTitle>{failed ? "Gotowe, z uwagami" : "Gotowe"}</AlertTitle>
-                <AlertDescription>Dodano {plural(added.length, ["projekt", "projekty", "projektów"])}.</AlertDescription>
+                <AlertDescription>Dodano {plural(added.length, ["inwestycję", "inwestycje", "inwestycji"])}.</AlertDescription>
               </Alert>
             )}
           </div>

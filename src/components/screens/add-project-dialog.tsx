@@ -126,7 +126,7 @@ export function AddProjectDialog({ addProject, enrichAction, suggestedId }: AddP
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
-        <PlusIcon /> Dodaj projekt
+        <PlusIcon /> Dodaj inwestycję
       </Button>
       <Dialog open={open} onOpenChange={(next) => next && setOpen(true)}>
         <DialogContent
@@ -136,7 +136,7 @@ export function AddProjectDialog({ addProject, enrichAction, suggestedId }: AddP
           className="max-h-[92svh] overflow-y-auto sm:max-w-2xl"
         >
           <DialogHeader>
-            <DialogTitle>Nowy projekt</DialogTitle>
+            <DialogTitle>Nowa zrealizowana inwestycja</DialogTitle>
             <DialogDescription>
               Pola odpowiadają kolumnom szablonu XLSX. Wymagane: identyfikator i nazwa; NIP, województwo i numer BZP/KPO pozwalają automatycznie odnaleźć przetarg w BZP.
             </DialogDescription>
@@ -236,7 +236,7 @@ export function AddProjectDialog({ addProject, enrichAction, suggestedId }: AddP
 
             <Label className="flex items-center gap-2 font-normal">
               <Checkbox checked={enrich} onCheckedChange={(v) => setEnrich(Boolean(v))} disabled={!enrichAction} />
-              Po dodaniu od razu wzbogać projekt danymi z BZP
+              Po dodaniu od razu wzbogać inwestycję danymi z BZP
             </Label>
 
             {message && <p className="text-sm text-destructive">{message}</p>}
@@ -247,7 +247,7 @@ export function AddProjectDialog({ addProject, enrichAction, suggestedId }: AddP
               Anuluj
             </Button>
             <Button type="submit" form="add-project-form" disabled={pending}>
-              {pending ? <Spinner /> : <PlusIcon />} Dodaj projekt
+              {pending ? <Spinner /> : <PlusIcon />} Dodaj inwestycję
             </Button>
           </DialogFooter>
         </DialogContent>

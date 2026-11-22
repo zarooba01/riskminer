@@ -85,7 +85,7 @@ export function MatchDialog({ project, match, actions, children }: Props) {
   const description = !match
     ? "Nie ma powiązanego przetargu. Wskaż numer ogłoszenia o zamówieniu w BZP."
     : match.status === "proposed"
-      ? "System znalazł ten przetarg wyszukiwaniem. Sprawdź, czy to na pewno ten projekt."
+      ? "System znalazł ten przetarg wyszukiwaniem. Sprawdź, czy to na pewno ta inwestycja."
       : "Powiązanie zatwierdzone. Jeśli jest błędne, wskaż inny przetarg.";
 
   return (
@@ -109,7 +109,7 @@ export function MatchDialog({ project, match, actions, children }: Props) {
 
         <div className="grid gap-3 md:grid-cols-2">
           <Side
-            title="Projekt z pliku"
+            title="Inwestycja z pliku"
             rows={[
               ["Nazwa", project.title],
               ["Zamawiający", project.beneficiary_name],

@@ -30,7 +30,7 @@ export const navItems: NavItem[] = [
   { title: "Pulpit", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Nowa inwestycja", href: "/assessments/new", icon: ClipboardCheckIcon },
   { title: "Zapisane oceny", href: "/assessments", icon: FileStackIcon },
-  { title: "Projekty", href: "/projects", icon: FolderKanbanIcon },
+  { title: "Zrealizowane inwestycje", href: "/projects", icon: FolderKanbanIcon },
   { title: "Weryfikacja", href: "/review", icon: ListChecksIcon },
   { title: "Modele", href: "/llm", icon: ScaleIcon },
   { title: "Baza porównawcza", href: "/reference", icon: DatabaseIcon },

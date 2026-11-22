@@ -59,7 +59,7 @@ const pln = (v: number | null) => (v == null ? "brak" : `${v.toLocaleString("pl-
 export async function buildRiskEventsSpec(projectId: string): Promise<{ spec: TaskSpec<typeof riskEventsSchema>; sourceTexts: Map<string, { id: string; text: string }> }> {
   const supabase = db();
   const { data: project } = await supabase.from("rm_projects").select("*").eq("id", projectId).single();
-  if (!project) throw new Error("Nie znaleziono projektu.");
+  if (!project) throw new Error("Nie znaleziono inwestycji.");
   const p = project as Project;
 
   const { data: procs } = await supabase.from("rm_procurements").select("id").eq("project_id", projectId).neq("status", "rejected");
