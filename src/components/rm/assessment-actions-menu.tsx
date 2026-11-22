@@ -1,6 +1,6 @@
 "use client";
 
-import { EllipsisIcon, FileJsonIcon, FileSpreadsheetIcon, RefreshCwIcon } from "lucide-react";
+import { EllipsisIcon, FileJsonIcon, FileSpreadsheetIcon, FileTextIcon, RefreshCwIcon } from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
 
@@ -44,6 +44,11 @@ export function AssessmentActionsMenu({ assessmentId, rerun }: Props) {
         <DropdownMenuItem asChild>
           <a href={`${base}?format=json`}>
             <FileJsonIcon /> Cała ocena (JSON)
+          </a>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <a href={`${base}?format=md`}>
+            <FileTextIcon /> Raport (Markdown)
           </a>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

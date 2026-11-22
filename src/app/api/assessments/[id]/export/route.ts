@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { assessmentMarkdown } from "@/lib/assess/markdown";
 import { assessmentExport } from "@/lib/assess/queries";
 import { requireUser } from "@/lib/auth/session";
 import { toCsv } from "@/lib/rm/export";
@@ -7,8 +8,9 @@ import { toCsv } from "@/lib/rm/export";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/assessments/<id>/export?format=json|csv[&part=items|matches]
- * JSON — cała ocena (założenia, statystyka, przypadki, pozycje ze źródłami); CSV — pozycje albo przypadki jako tabela.
+ * GET /api/assessments/<id>/export?format=json|md|csv[&part=items|matches]
+ * JSON — cała ocena (założenia, statystyka, przypadki, pozycje ze źródłami); Markdown — ta sama ocena jako raport do czytania;
+ * CSV — pozycje albo przypadki jako tabela.
  */
 export async function GET(request: Request, { params }: RouteContext<"/api/assessments/[id]/export">) {
   await requireUser();
@@ -17,6 +19,11 @@ export async function GET(request: Request, { params }: RouteContext<"/api/asses
   if (!data) return NextResponse.json({ error: "Nie znaleziono oceny." }, { status: 404 });
   const url = new URL(request.url);
   const stamp = new Date().toISOString().slice(0, 10);
+  if (url.searchParams.get("format") === "md") {
+    return new NextResponse(assessmentMarkdown(data), {
+      headers: { "Content-Type": "text/markdown; charset=utf-8", "Content-Disposition": `attachment; filename="riskminer_ocena_${id.slice(0, 8)}_${stamp}.md"` },
+    });
+  }
   if (url.searchParams.get("format") === "csv") {
     const part = url.searchParams.get("part") === "matches" ? "matches" : "items";
     const rows =
